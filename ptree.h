@@ -9,6 +9,7 @@ typedef struct proc {
     struct proc *child;
     struct proc *sib;
     pid_t pid, ppid;
+    uid_t uid, gid;
     time_t ctime;
     char process[80];
     char status;

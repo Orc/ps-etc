@@ -62,6 +62,8 @@ ingest(struct dirent *de)
 	    bzero(&unsort[nru], sizeof unsort[nru]);
 	    unsort[nru].pid = pid;
 	    unsort[nru].ppid = ppid;
+	    unsort[nru].uid = st.st_uid;
+	    unsort[nru].gid = st.st_gid;
 	    unsort[nru].ctime = st.st_ctime;
 	    unsort[nru].status = status;
 	    strncpy(unsort[nru].process, process, sizeof unsort[nru].process);
