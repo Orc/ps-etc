@@ -28,5 +28,5 @@ distclean spotless: clean
 	rm -f @GENERATED_FILES@ @CONFIG_FILES@
 
 
-pstree.o: pstree.c config.c ptree.h cstrings.h
-ptree.o: ptree.c config.c ptree.h cstrings.h
+pstree.o: pstree.c config.h ptree.h cstrings.h
+ptree.o: ptree.c config.h ptree.h cstrings.h
