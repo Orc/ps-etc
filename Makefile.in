@@ -8,10 +8,10 @@ PGM=pstree
 all: $(PGM)
 
 install: $(PGM)
-	@INSTALL_PROG@ $(PGM) $(BINDIR)
+	@INSTALL_PROGRAM@ $(PGM) $(BINDIR)
 
 install.man:
-	mkdir -p $(MANDIR)/man1
+	@INSTALL_DIR@ $(MANDIR)/man1
 	@INSTALL_DATA@ pstree.1 $(MANDIR)/man1
 
 pstree: $(OBJS)
