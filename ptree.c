@@ -84,6 +84,7 @@ ingest(struct dirent *de, int flags)
 	    }
 	    bzero(&unsort[nru], sizeof unsort[nru]);
 	    unsort[nru].parent = (Proc*)-1;
+	    unsort[nru].children = -1;
 	    unsort[nru].pid = pid;
 	    unsort[nru].ppid = ppid;
 	    unsort[nru].uid = st.st_uid;
@@ -121,6 +122,24 @@ pfind(pid_t pid)
 }
 
 
+static int
+children(Proc *p, int countsibs)
+{
+    int count = 1;
+
+    if ( !p ) return 0;
+    if ( p->children != -1 ) return p->children;
+
+    count += children(p->child, 1);
+
+    if ( countsibs )
+	while ( p = p->sib )
+	    count += children(p->child, 1);
+
+    return count;
+}
+
+
 static void
 shuffle()
 {
@@ -149,6 +168,9 @@ shuffle()
 		    my->parent = 0;
 	    }
 	}
+
+    for (i=0; i < nru; i++)
+	unsort[i].children = children(&unsort[i], 0);
 }
 
 

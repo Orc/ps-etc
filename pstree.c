@@ -46,6 +46,9 @@ cmp(Proc *a, Proc *b)
 	rc = strcmp(a->process, b->process);
 
     if ( rc == 0 )
+	rc = a->children - b->children;
+
+    if ( rc == 0 )
 	return a->pid - b->pid;
 
     return rc;
@@ -135,6 +138,31 @@ pc()
 }
 
 
+static int _bracket = 0;
+
+void
+bo()
+{
+    _bracket++;
+}
+
+void
+bc()
+{
+    if (_bracket) --_bracket;
+}
+
+void
+eol()
+{
+    int i;
+
+    for (i=0; i < _bracket; i++)
+	putchar(']');
+    putchar('\n');
+}
+
+
 /* to keep track of downward branches, we stuff (column,downward arrow)
  * a tabstack and have dle() properly expand them into spaces, '|', and
  * '`'s
@@ -199,6 +227,7 @@ void
 dle()
 {
     int i, xp, dsp;
+    char c;
 
     for ( xp = i = dsp = 0; dsp < tsp; dsp++ ) {
 	while ( xp < T(stack)[dsp].column ) {
@@ -229,11 +258,6 @@ printjob(int first, int count, Proc *p)
 	tind = printf("-");
 
     tind += printf("%s", p->process);
-    if ( count )
-	tind += printf("]");
-
-    if ( showpid ) 
-	tind += po() + printf("%d", p->pid);
 
     if ( showuser && p->parent && (p->uid != p->parent->uid) ) {
 	struct passwd *pw = getpwuid(p->uid);
@@ -244,6 +268,9 @@ printjob(int first, int count, Proc *p)
 	else
 	    tind += printf("#%d", p->uid);
     }
+    if ( showuser )
+	tind += po() + printf("%d", p->children);
+
     tind += pc();
 
     if ( showargs ) {
@@ -262,11 +289,10 @@ printjob(int first, int count, Proc *p)
 		    putchar(c);
 	    }
 	}
-	putchar('\n');
+	eol();
     }
     else if ( p->child ) {
 	putchar('-');
-	putchar( p->child->sib ? '+' : '-');
 	tind++;
     }
     return tind;
@@ -310,23 +336,28 @@ print(int indent, Proc *node)
 {
     int count = 0;
     int first = 1;
-    int sibs;
+    char branch = '+';
 
     if ( node == 0 ) {
-	if ( !showargs ) putchar('\n');
+	if ( !showargs ) eol();
 	return;
     }
     if (sortme)
 	node = sibsort(node);
 
-    sibs = node->sib != 0;
-    push(peek() + (showargs ? 2 : indent), sibs ? '|' : ' ');
     do {
 	if ( compress && sameas(node, node->sib, 0) )
 	    count++;
 	else {
-	    if ( sibs && !node->sib ) active('`');
+	    if ( first ) {
+		putchar( node->sib ? '+' : '-' );
+		branch = node->sib ? '|' : ' ';
+		push(peek() + (showargs ? 2 : indent), branch);
+	    }
+	    if ( branch != ' ' && !node->sib) active('`');
+	    if ( count ) bo();
 	    print(printjob(first,count,node),node->child);
+	    if ( count ) bc();
 	    count=first=0;
 	}
     } while ( node = node->sib );

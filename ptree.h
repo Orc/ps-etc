@@ -12,6 +12,7 @@ typedef struct proc {
     pid_t pid, ppid;
     uid_t uid, gid;
     time_t ctime;
+    int children;
     char process[80];
     Cstring cmdline;
     char status;
