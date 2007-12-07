@@ -41,8 +41,16 @@ ingest(struct dirent *de, int flags)
 	if (!isdigit(*p))
 	    return 0;
 
+#ifdef OS_LINUX
+#define STATFILE "stat"
+#elif OS_FREEBSD
+#define STATFILE "status"
+#else
+#error "No support for this OS"
+#endif
+
     if (chdir(de->d_name) == 0) {
-	if ( (stat(".", &st) != 0) || !(f = fopen("stat", "r")) ) {
+	if ( (stat(".", &st) != 0) || !(f = fopen(STATFILE, "r")) ) {
 	    chdir("..");
 	    return 0;
 	}
