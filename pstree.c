@@ -139,10 +139,12 @@ pc()
  * a tabstack and have dle() properly expand them into spaces, '|', and
  * '`'s
  */
-struct tabstack {
+typedef struct tabstack {
     int column;
     int active;
-} stack[100];
+} TabStack;
+
+STRING(TabStack) stack;
 
 int tsp = 0;
 
@@ -152,8 +154,11 @@ int tsp = 0;
 void
 push(int column, int c)
 {
-    stack[tsp].column = column;
-    stack[tsp].active = c;
+    if ( tsp >= S(stack) )
+	EXPAND(stack);
+
+    T(stack)[tsp].column = column;
+    T(stack)[tsp].active = c;
     ++tsp;
 }
 
@@ -163,7 +168,7 @@ push(int column, int c)
 void
 active(char c)
 {
-    if (tsp) stack[tsp-1].active = c;
+    if (tsp) T(stack)[tsp-1].active = c;
 }
 
 
@@ -181,7 +186,7 @@ pop()
 int
 peek()
 {
-    return tsp ? stack[tsp-1].column : 0 ;
+    return tsp ? T(stack)[tsp-1].column : 0 ;
 }
 
 
@@ -196,13 +201,13 @@ dle()
     int i, xp, dsp;
 
     for ( xp = i = dsp = 0; dsp < tsp; dsp++ ) {
-	while ( xp < stack[dsp].column ) {
+	while ( xp < T(stack)[dsp].column ) {
 	    ++xp;
 	    putchar(' ');
 	}
-	putchar(stack[dsp].active);
-	if ( stack[dsp].active == '`' )
-	    stack[dsp].active = ' ';
+	putchar(T(stack)[dsp].active);
+	if ( T(stack)[dsp].active == '`' )
+	    T(stack)[dsp].active = ' ';
     }
 }
 

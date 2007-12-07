@@ -145,6 +145,8 @@ shuffle()
 		    else
 			p->child = my;
 		}
+		else
+		    my->parent = 0;
 	    }
 	}
 }
