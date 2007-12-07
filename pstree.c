@@ -1,19 +1,42 @@
+/*
+ * pstree: display a process heirarchy.
+ */
 #include "config.h"
 
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/types.h>
 
+#include <unistd.h>
+#if HAVE_LIBGEN_H
+# include <libgen.h>
+#endif
+
 #include "ptree.h"
 
+#if !HAVE_BASENAME
+#include <string.h>
 
-int showargs = 0;
-int compress = 1;
-int clipping = 1;
-int sortme   = 1;
-int showpid  = 0;
-int showuser = 0;
+char *
+basename(char *p)
+{
+    char *ret = strrchr(p, '/');
 
+    return ret ? ret+1 : p;
+}
+#endif
+
+
+int showargs = 0;	/* -a:  show the entire command line */
+int compress = 1;	/* !-c: compact duplicate subtrees */
+int clipping = 1;	/* !-l: clip output to screenwidth */
+int sortme   = 1;	/* !-n: sort output */
+int showpid  = 0;	/* -p:  show process ids */
+int showuser = 0;	/* -u:  show username transitions */
+
+
+/* do a more macosish sort;  try to not pay attention to case when sorting.
+ */
 int
 cmp(Proc *a, Proc *b)
 {
@@ -29,28 +52,29 @@ cmp(Proc *a, Proc *b)
 }
 
 
-#if 1
-/* merge sort */
+/* sort the sibling list by ripping into two substrings, sorting
+ * each substring, then stitching them together with a merge sort.
+ */
 Proc *
 sibsort(Proc *p)
 {
-    Proc *d, *t, *left = 0, *right = 0;
+    Proc *d, *tail, *left = 0, *right = 0;
     int even = 0;
 
     if ( !(p && p->sib) ) return p;
 
     /* split into two lists */
     while (p) {
-	t = p;
+	d = p;
 	p = p->sib;
 
 	if (even) {
-	    t->sib = left;
-	    left = t;
+	    d->sib = left;
+	    left = d;
 	}
 	else {
-	    t->sib = right;
-	    right = t;
+	    d->sib = right;
+	    right = d;
 	}
 	even = !even;
     }
@@ -60,7 +84,7 @@ sibsort(Proc *p)
     if ( right ) right = sibsort(right);
 
     /* merge them together */
-    for ( p = t = 0; left && right;  ) {
+    for ( p = tail = 0; left && right;  ) {
 	if (cmp(left,right) < 0) {
 	    d = left;
 	    left = left->sib;
@@ -70,64 +94,26 @@ sibsort(Proc *p)
 	    right = right->sib;
 	}
 	if ( p )
-	    t->sib = d;
+	    tail->sib = d;
 	else
 	    p = d;
-	t = d;
+	tail = d;
     }
-    t->sib = left ? left : right;
+    tail->sib = left ? left : right;
 
     return p;
 }
-#else
-/* muddled sort */
-Proc *
-sibsort(Proc *p)
-{
-    Proc *a, *b, *t, *r;
-    int rc;
-    int i;
-
-    if ( p == 0 ) return p;
-
-    /* break off an initial sorted segment */
-    for (i=0, a = r = p; r->sib && cmp(r,r->sib) > 0; r = r->sib)
-	i++;
-
-    if ( r->sib == 0 )		/* all sorted */
-	return p;
-
-    b = r->sib;
-    r->sib = 0;			/* truncate first sorted list */
-    b = sibsort(b);		/* sort remainder of list */
-
-    /* merge the two sorted lists */
-
-    p = t = b;
-    b = b->sib;
-
-    while ( a && b ) {
-	if ( cmp(a,b) > 0 ) {
-	    r = a;
-	    a = a->sib;
-	}
-	else {
-	    r = b;
-	    b = b->sib;
-	}
-	t->sib = r;
-	t = r;
-    }
-    t->sib = a ? a : b;
-
-    return p;
-}
-#endif
 
 
+/* fancy output printing:  po() and pc() are for
+ * comma-delimited ()'ed strings.
+ */
 static int _paren = 0;
 
-
+/* when first called, po() prints '(', then every other time
+ * it's called it prints ',' until pc() is called to close
+ * the parentheses.
+ */
 int
 po()
 {
@@ -149,6 +135,10 @@ pc()
 }
 
 
+/* to keep track of downward branches, we stuff (column,downward arrow)
+ * a tabstack and have dle() properly expand them into spaces, '|', and
+ * '`'s
+ */
 struct tabstack {
     int column;
     int active;
@@ -157,6 +147,8 @@ struct tabstack {
 int tsp = 0;
 
 
+/* shove a branch onto the tabstack.
+ */
 void
 push(int column, int c)
 {
@@ -166,6 +158,8 @@ push(int column, int c)
 }
 
 
+/* set the downward arrow at tos.
+ */
 void
 active(char c)
 {
@@ -173,6 +167,8 @@ active(char c)
 }
 
 
+/* pop() [and discard] tos
+ */
 void
 pop()
 {
@@ -180,6 +176,8 @@ pop()
 }
 
 
+/* return the column position at tos, or 0 if the stack is empty.
+ */
 int
 peek()
 {
@@ -187,6 +185,11 @@ peek()
 }
 
 
+/* print whitespace and downward branches at the start of a line.
+ * '`' is a specialcase downward branch;  it's where a branch turns
+ * towards the end of the line, so when dle() prints it it resets it
+ * to ' '
+ */
 void
 dle()
 {
@@ -204,6 +207,10 @@ dle()
 }
 
 
+/* print process information (process name, id, uid translation)
+ * and branch prefixes and suffixes.   Returns the # of characters
+ * printed, so print() can adjust the indent for subtrees
+ */
 int
 printjob(int first, int count, Proc *p, Proc *pp)
 {
@@ -261,6 +268,12 @@ printjob(int first, int count, Proc *p, Proc *pp)
 }
 
 
+/* compare two process trees (for subtree compaction)
+ * process trees are identical if
+ *     (a) the processes are the same
+ *     (b) their ->child trees are identical
+ *     (c) [if required] all of their siblings are identical
+ */
 int
 sameas(Proc *a, Proc *b, int walk)
 {
@@ -285,6 +298,8 @@ sameas(Proc *a, Proc *b, int walk)
 }
 
 
+/* print() a subtree, indented by a header.
+ */
 void
 print(int indent, Proc *node, Proc *parent)
 {

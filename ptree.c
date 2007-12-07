@@ -1,3 +1,7 @@
+/*
+ * read the process table, build a linked list describing the
+ * process heirarchy.
+ */
 #include "config.h"
 
 #include <stdio.h>
