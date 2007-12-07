@@ -47,13 +47,21 @@ ingest(struct dirent *de, int flags)
 	    return 0;
 	}
 
+#ifdef OS_LINUX
+#define REQUIRED 4
 	ct = fscanf(f, "%d (%200s %c %d",  &pid, process, &status, &ppid);
 	fclose(f);
 
 	if ( strlen(process) && (process[strlen(process)-1] == ')') )
 	    process[strlen(process)-1] = 0;
+#elif OS_FREEBSD
+#define REQUIRED 3
+	ct = fscanf(f, "%s %d %d", process, &pid, &ppid);
+#else
+# error "This OS is not supported (sorry!)"
+#endif
 
-	if (ct == 4 ) {
+	if ( ct == REQUIRED ) {
 	    if (nru >= szu) {
 		szu = 10 + (szu*10);
 		unsort = unsort ? realloc(unsort, szu * sizeof(*unsort) ) : malloc( szu * sizeof(*unsort) );

@@ -12,8 +12,6 @@ int sortme   = 1;
 int showpid  = 0;
 int showuser = 0;
 
-char col[1000];
-
 int
 cmp(Proc *a, Proc *b)
 {
@@ -29,7 +27,7 @@ cmp(Proc *a, Proc *b)
 }
 
 
-#if 0
+#if 1
 /* merge sort */
 Proc *
 sibsort(Proc *p)
@@ -261,7 +259,29 @@ printjob(int first, int count, Proc *p, Proc *pp)
 }
 
 
-void printtree(Proc *, Proc *, int, int);
+int
+sameas(Proc *a, Proc *b, int walk)
+{
+    if ( ! (a && b) )
+	return (a == b);
+
+    if ( strcmp(a->process, b->process) != 0 )
+	return 0;
+
+    if ( !sameas(a->child, b->child, 1) )
+	return 0;
+
+    if ( !walk ) return 1;
+
+    do {
+	if ( !sameas(a->sib, b->sib, 0) )
+	    return 0;
+	a = a->sib;
+	b = b->sib;
+    } while ( a && b );
+    return 1;
+}
+
 
 void
 print(int indent, Proc *node, Proc *parent)
@@ -278,10 +298,7 @@ print(int indent, Proc *node, Proc *parent)
 
     push(peek() + (showargs ? 2 : indent), '|');
     do {
-	if ( compress && node->child == 0
-		      && node->sib
-		      && node->sib->child == 0
-		      && strcmp(node->process, node->sib->process) == 0)
+	if ( compress && sameas(node, node->sib, 0) )
 	    count++;
 	else {
 	    if ( !node->sib ) active('`');
@@ -328,8 +345,6 @@ main(int argc, char **argv)
 
     argc -= optind;
     argv += optind;
-
-    memset(col, ' ', sizeof col);
 
     if (argc < 1)
 	print(printjob(1,0,init,0),init->child, init);
