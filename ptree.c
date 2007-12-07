@@ -133,7 +133,7 @@ shuffle()
 	    my = &unsort[i];
 	    if (my->parent == (Proc*)-1) {
 		--todo;
-		if ( (my->pid != my->ppid) && ((p = pfind(my->ppid)) >= 0) ) {
+		if ( (my->pid != my->ppid) && (p = pfind(my->ppid)) ) {
 		    my->parent = p;
 
 		    if (p->child) {
