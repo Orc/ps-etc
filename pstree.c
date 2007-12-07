@@ -29,6 +29,58 @@ cmp(Proc *a, Proc *b)
 }
 
 
+#if 0
+/* merge sort */
+Proc *
+sibsort(Proc *p)
+{
+    Proc *d, *t, *left = 0, *right = 0;
+    int even = 0;
+
+    if ( !(p && p->sib) ) return p;
+
+    /* split into two lists */
+    while (p) {
+	t = p;
+	p = p->sib;
+
+	if (even) {
+	    t->sib = left;
+	    left = t;
+	}
+	else {
+	    t->sib = right;
+	    right = t;
+	}
+	even = !even;
+    }
+
+    /* sort them */
+    if ( left ) left = sibsort(left);
+    if ( right ) right = sibsort(right);
+
+    /* merge them together */
+    for ( p = t = 0; left && right;  ) {
+	if (cmp(left,right) < 0) {
+	    d = left;
+	    left = left->sib;
+	}
+	else {
+	    d = right;
+	    right = right->sib;
+	}
+	if ( p )
+	    t->sib = d;
+	else
+	    p = d;
+	t = d;
+    }
+    t->sib = left ? left : right;
+
+    return p;
+}
+#else
+/* muddled sort */
 Proc *
 sibsort(Proc *p)
 {
@@ -70,7 +122,7 @@ sibsort(Proc *p)
 
     return p;
 }
-
+#endif
 
 
 static int _paren = 0;
@@ -209,33 +261,34 @@ printjob(int first, int count, Proc *p, Proc *pp)
 }
 
 
+void printtree(Proc *, Proc *, int, int);
+
 void
-print(int indent, Proc *p, Proc *pp)
+print(int indent, Proc *node, Proc *parent)
 {
     int count = 0;
     int first = 1;
 
-    if ( p == 0 ) {
+    if ( node == 0 ) {
 	if ( !showargs ) putchar('\n');
 	return;
     }
+    if (sortme)
+	node = sibsort(node);
 
     push(peek() + (showargs ? 2 : indent), '|');
     do {
-	if ( compress && p->child == 0
-		      && p->sib
-		      && p->sib->child == 0
-		      && strcmp(p->process, p->sib->process) == 0)
+	if ( compress && node->child == 0
+		      && node->sib
+		      && node->sib->child == 0
+		      && strcmp(node->process, node->sib->process) == 0)
 	    count++;
 	else {
-	    if ( sortme )
-		p->child = sibsort(p->child);
-
-	    if ( !p->sib ) active('`');
-	    print( printjob(first, count, p, pp), p->child, p );
+	    if ( !node->sib ) active('`');
+	    print(printjob(first,count,node,parent),node->child, node);
 	    count=first=0;
 	}
-    } while ( p = p->sib );
+    } while ( node = node->sib );
     pop();
 }
 
@@ -245,7 +298,7 @@ userjobs(Proc *p, uid_t user)
 {
     for ( ; p ; p = p->sib )
 	if (p->uid == user)
-	    print( printjob(1,0,p,0), p->child, p );
+	    print(printjob(1,0,p,0),p->child, p);
 	else
 	    userjobs(p->child, user);
 }
@@ -279,10 +332,10 @@ main(int argc, char **argv)
     memset(col, ' ', sizeof col);
 
     if (argc < 1)
-	print(printjob(1, 0, init, 0), init->child, init);
+	print(printjob(1,0,init,0),init->child, init);
     else if ( (curid = atoi(argv[0])) > 0 ) {
 	if ( init = pfind(curid) )
-	    print(printjob(1, 0, init, 0), init->child, init);
+	    print(printjob(1,0,init,0),init->child, init);
     }
     else {
 	struct passwd *pwd;
