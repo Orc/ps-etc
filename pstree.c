@@ -350,7 +350,8 @@ print(int indent, Proc *node)
 	    count++;
 	else {
 	    if ( first ) {
-		putchar( node->sib ? '+' : '-' );
+		if ( !showargs )
+		    putchar( node->sib ? '+' : '-' );
 		branch = node->sib ? '|' : ' ';
 		push(peek() + (showargs ? 2 : indent), branch);
 	    }
