@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 
 #include "ptree.h"
 
@@ -25,11 +26,12 @@ compar(void *c1, void *c2)
 
 
 static int
-ingest(struct dirent *de)
+ingest(struct dirent *de, int flags)
 {
     FILE *f;
     char *p;
     int ct;
+    int c;
     pid_t pid, ppid;
     char status;
     char process[200];
@@ -46,6 +48,7 @@ ingest(struct dirent *de)
 	}
 
 	ct = fscanf(f, "%d (%200s %c %d",  &pid, process, &status, &ppid);
+	fclose(f);
 
 	if ( strlen(process) && (process[strlen(process)-1] == ')') )
 	    process[strlen(process)-1] = 0;
@@ -67,9 +70,18 @@ ingest(struct dirent *de)
 	    unsort[nru].ctime = st.st_ctime;
 	    unsort[nru].status = status;
 	    strncpy(unsort[nru].process, process, sizeof unsort[nru].process);
+
+	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
+		while ( (c = getc(f)) != EOF ) {
+		    if ( T(unsort[nru].cmdline) )
+			EXPAND(unsort[nru].cmdline) = c;
+		    else if ( c == 0 )
+			CREATE(unsort[nru].cmdline);
+		}
+		fclose(f);
+	    }
 	    nru++;
 	}
-	fclose(f);
 	chdir("..");
 	return nru;
     }
@@ -121,7 +133,7 @@ shuffle()
 
 
 Proc *
-ptree()
+ptree(int flags)
 {
     DIR *d;
     struct dirent *de;
@@ -133,7 +145,7 @@ ptree()
     init = 0;
     if ( d = opendir(".") ) {
 	while (de = readdir(d))
-	    if ( ingest(de) == -1 ) {
+	    if ( ingest(de, flags) == -1 ) {
 		fchdir(home);
 		return 0;
 	    }

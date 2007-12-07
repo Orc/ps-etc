@@ -39,7 +39,7 @@ sibsort(Proc *p)
     if ( p == 0 ) return p;
 
     /* break off an initial sorted segment */
-    for (i=0, a = r = p; r->sib && cmp(r,r->sib) < 0; r = r->sib)
+    for (i=0, a = r = p; r->sib && cmp(r,r->sib) > 0; r = r->sib)
 	i++;
 
     if ( r->sib == 0 )		/* all sorted */
@@ -51,17 +51,11 @@ sibsort(Proc *p)
 
     /* merge the two sorted lists */
 
-    if ( cmp(a,b) < 0 ) {
-	p = t = a;
-	a = a->sib;
-    }
-    else {
-	p = t = b;
-	b = b->sib;
-    }
+    p = t = b;
+    b = b->sib;
 
     while ( a && b ) {
-	if ( cmp(a,b) < 0 ) {
+	if ( cmp(a,b) > 0 ) {
 	    r = a;
 	    a = a->sib;
 	}
@@ -103,34 +97,75 @@ pc()
 }
 
 
-int
-printproc(int indent, int first, int count, Proc *p, Proc *pp)
+struct tabstack {
+    int column;
+    int active;
+} stack[100];
+
+int tsp = 0;
+
+
+void
+push(int column, int c)
 {
-    int tind;
+    stack[tsp].column = column;
+    stack[tsp].active = c;
+    ++tsp;
+}
 
-    if ( first ) {
-	if ( indent ) putchar('-');
-	tind = indent;
-    }
-    else
-	tind = printf("%*.*s",indent,indent,col);
 
-    if ( first && !indent ) {
-	if ( count > 1 )
-	    tind += printf("%d*[", count);
+void
+active(char c)
+{
+    if (tsp) stack[tsp-1].active = c;
+}
+
+
+void
+pop()
+{
+    if (tsp) --tsp;
+}
+
+
+int
+peek()
+{
+    return tsp ? stack[tsp-1].column : 0 ;
+}
+
+
+void
+dle()
+{
+    int i, xp, dsp;
+
+    for ( xp = i = dsp = 0; dsp < tsp; dsp++ ) {
+	while ( xp < stack[dsp].column ) {
+	    ++xp;
+	    putchar(' ');
+	}
+	putchar(stack[dsp].active);
+	if ( stack[dsp].active == '`' )
+	    stack[dsp].active = ' ';
     }
-    else {
-	char tic = p->sib ? (first ? '+' : '|')
-			  : (first ? '-' : '*');
-	col[indent] = '|';
-	if ( count > 1 )
-	    tind += printf("%c-%d*[", tic, count);
-	else
-	    tind += printf("%c-", tic);
-    }
+}
+
+
+int
+printjob(int first, int count, Proc *p, Proc *pp)
+{
+    int tind = 0;
+
+    if ( showargs || !first ) dle();
+
+    if ( count )
+	tind = printf("-%d*[", 1+count);
+    else if ( tsp )
+	tind = printf("-");
 
     tind += printf("%s", p->process);
-    if ( count > 1 )
+    if ( count )
 	tind += printf("]");
 
     if ( showpid ) 
@@ -147,6 +182,29 @@ printproc(int indent, int first, int count, Proc *p, Proc *pp)
     }
     tind += pc();
 
+    if ( showargs ) {
+	if ( T(p->cmdline) ) {
+	    unsigned int i, c;
+
+	    putchar(' ');
+	    for (i=0; i < S(p->cmdline); i++) {
+		c = T(p->cmdline)[i];
+
+		if ( c == 0 )
+		    putchar(' ');
+		else if ( c <= ' ' || !isprint(c) )
+		    printf("\\\%03o", c);
+		else
+		    putchar(c);
+	    }
+	}
+	putchar('\n');
+    }
+    else if ( p->child ) {
+	putchar('-');
+	putchar( p->child->sib ? '+' : '-');
+	tind++;
+    }
     return tind;
 }
 
@@ -154,20 +212,15 @@ printproc(int indent, int first, int count, Proc *p, Proc *pp)
 void
 print(int indent, Proc *p, Proc *pp)
 {
-    int count = 1, first = 1;
-    int tind, l0 = (indent == 0);
-    Proc *w;
+    int count = 0;
+    int first = 1;
 
     if ( p == 0 ) {
-	putchar('\n');
+	if ( !showargs ) putchar('\n');
 	return;
     }
 
-    if (indent) {
-	++indent;
-	col[indent] = '|';
-    }
-
+    push(peek() + (showargs ? 2 : indent), '|');
     do {
 	if ( compress && p->child == 0
 		      && p->sib
@@ -177,12 +230,13 @@ print(int indent, Proc *p, Proc *pp)
 	else {
 	    if ( sortme )
 		p->child = sibsort(p->child);
-	    print( printproc(indent,first,count,p,pp), p->child, p );
-	    count = 1;
-	    first = 0;
+
+	    if ( !p->sib ) active('`');
+	    print( printjob(first, count, p, pp), p->child, p );
+	    count=first=0;
 	}
     } while ( p = p->sib );
-    col[indent] = ' ';
+    pop();
 }
 
 
@@ -191,7 +245,7 @@ userjobs(Proc *p, uid_t user)
 {
     for ( ; p ; p = p->sib )
 	if (p->uid == user)
-	    print( printproc(0,1,1,p,0), p->child, p );
+	    print( printjob(1,0,p,0), p->child, p );
 	else
 	    userjobs(p->child, user);
 }
@@ -201,8 +255,7 @@ main(int argc, char **argv)
 {
     pid_t curid;
      
-    Proc *init = ptree();
-    Proc *cur;
+    Proc *init;
     Proc *newest;
     int opt;
 
@@ -211,13 +264,14 @@ main(int argc, char **argv)
     opterr = 1;
     while ( (opt = getopt(argc, argv, "aclnpu")) != EOF )
 	switch (opt) {
-	case 'a': showargs = 1; break;
+	case 'a': showargs = 1; compress = 0; break;
 	case 'c': compress = 0; break;
 	case 'l': clipping = 0; break;
 	case 'n': sortme = compress = 0; break;
 	case 'p': showpid  = 1; compress = 0; break;
 	case 'u': showuser = 1; break;
 	}
+    init = ptree(showargs ? PTREE_ARGS : 0);
 
     argc -= optind;
     argv += optind;
@@ -225,10 +279,10 @@ main(int argc, char **argv)
     memset(col, ' ', sizeof col);
 
     if (argc < 1)
-	print(0, init, 0);
+	print(printjob(1, 0, init, 0), init->child, init);
     else if ( (curid = atoi(argv[0])) > 0 ) {
-	if ( cur = pfind(curid) )
-	    print(0, cur, 0);
+	if ( init = pfind(curid) )
+	    print(printjob(1, 0, init, 0), init->child, init);
     }
     else {
 	struct passwd *pwd;
