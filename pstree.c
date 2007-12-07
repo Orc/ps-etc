@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/types.h>
@@ -324,10 +326,10 @@ userjobs(Proc *p, uid_t user)
 main(int argc, char **argv)
 {
     pid_t curid;
-     
     Proc *init;
     Proc *newest;
     int opt;
+    char *e;
 
     argv[0] = basename(argv[0]);
 
@@ -346,9 +348,14 @@ main(int argc, char **argv)
     argc -= optind;
     argv += optind;
 
-    if (argc < 1)
+    if ( argc < 1 ) {
 	print(printjob(1,0,init,0),init->child, init);
-    else if ( (curid = atoi(argv[0])) > 0 ) {
+	exit(0);
+    }
+
+    curid = strtol(argv[0], &e, 10);
+
+    if ( *e == 0 ) {
 	if ( init = pfind(curid) )
 	    print(printjob(1,0,init,0),init->child, init);
     }

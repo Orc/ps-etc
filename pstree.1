@@ -1,0 +1,51 @@
+.\"     %A%
+.\"
+.Dd December 6, 2007
+.Dt PSTREE 1
+.Os MASTODON
+.Sh NAME
+.Nm pstree
+.Nd display a process heirarchy
+.Sh SYNOPSIS
+.Nm
+.Op Fl aclnpu
+.Op Ar pid No | Ar user
+.Sh DESCRIPTION
+The
+.Nm
+utility shows a heirarchy of active processes.  If
+no 
+.Ar user
+or
+.Ar pid
+is given, it shows all the processes descended from
+.Xr init 8 ,
+otherwise it shows the process tree(s) for the given
+.Ar user
+or
+.Ar pid .
+.Pp
+The options are as follows:
+.Bl -tag -width aaa
+.It Fl a
+Show the command line for each process.
+.It Fl c
+Don't collapse idential subtrees.
+.It Fl l
+Don't truncate long lines.
+.It Fl n
+Don't sort the process list.
+.It Fl p
+Show process ids.
+.It Fl u
+Show the process owner of each subtree.
+.El
+.Sh RETURN VALUES
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh SEE ALSO
+.Xr ps 1 .
+.Sh AUTHOR
+.An David Parsons
+.Pq Li orc@pell.chi.il.us

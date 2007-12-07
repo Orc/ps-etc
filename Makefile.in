@@ -1,0 +1,21 @@
+CC=@CC@
+BINDIR=@exedir@
+MANDIR=@mandir@
+
+OBJS=pstree.o ptree.o
+PGM=pstree
+
+all: $(PGM)
+
+install: $(PGM)
+	@INSTALL_PROG@ $(PGM) $(BINDIR)
+
+install.man:
+	mkdir -p $(MANDIR)/man1
+	@INSTALL_DATA@ pstree.1 $(MANDIR)/man1
+
+pstree: $(OBJS)
+	$(CC) -o pstree $(OBJS)
+
+clean:
+	rm -f pstree *.o
