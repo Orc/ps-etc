@@ -212,7 +212,7 @@ dle()
  * printed, so print() can adjust the indent for subtrees
  */
 int
-printjob(int first, int count, Proc *p, Proc *pp)
+printjob(int first, int count, Proc *p)
 {
     int tind = 0;
 
@@ -230,7 +230,7 @@ printjob(int first, int count, Proc *p, Proc *pp)
     if ( showpid ) 
 	tind += po() + printf("%d", p->pid);
 
-    if ( showuser && pp && (p->uid != pp->uid) ) {
+    if ( showuser && p->parent && (p->uid != p->parent->uid) ) {
 	struct passwd *pw = getpwuid(p->uid);
 
 	tind += po();
@@ -301,10 +301,11 @@ sameas(Proc *a, Proc *b, int walk)
 /* print() a subtree, indented by a header.
  */
 void
-print(int indent, Proc *node, Proc *parent)
+print(int indent, Proc *node)
 {
     int count = 0;
     int first = 1;
+    int sibs;
 
     if ( node == 0 ) {
 	if ( !showargs ) putchar('\n');
@@ -313,13 +314,14 @@ print(int indent, Proc *node, Proc *parent)
     if (sortme)
 	node = sibsort(node);
 
-    push(peek() + (showargs ? 2 : indent), '|');
+    sibs = node->sib != 0;
+    push(peek() + (showargs ? 2 : indent), sibs ? '|' : ' ');
     do {
 	if ( compress && sameas(node, node->sib, 0) )
 	    count++;
 	else {
-	    if ( !node->sib ) active('`');
-	    print(printjob(first,count,node,parent),node->child, node);
+	    if ( sibs && !node->sib ) active('`');
+	    print(printjob(first,count,node),node->child);
 	    count=first=0;
 	}
     } while ( node = node->sib );
@@ -332,7 +334,7 @@ userjobs(Proc *p, uid_t user)
 {
     for ( ; p ; p = p->sib )
 	if (p->uid == user)
-	    print(printjob(1,0,p,0),p->child, p);
+	    print(printjob(1,0,p),p->child);
 	else
 	    userjobs(p->child, user);
 }
@@ -367,7 +369,7 @@ main(int argc, char **argv)
     argv += optind;
 
     if ( argc < 1 ) {
-	print(printjob(1,0,init,0),init->child, init);
+	print(printjob(1,0,init),init->child);
 	exit(0);
     }
 
@@ -375,7 +377,7 @@ main(int argc, char **argv)
 
     if ( *e == 0 ) {
 	if ( init = pfind(curid) )
-	    print(printjob(1,0,init,0),init->child, init);
+	    print(printjob(1,0,init),init->child);
     }
     else {
 	struct passwd *pwd;

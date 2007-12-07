@@ -15,8 +15,6 @@
 
 #include "ptree.h"
 
-static Proc *init = 0;
-
 static Proc *unsort = 0;
 static int szu = 0;
 static int nru = 0;
@@ -85,6 +83,7 @@ ingest(struct dirent *de, int flags)
 		}
 	    }
 	    bzero(&unsort[nru], sizeof unsort[nru]);
+	    unsort[nru].parent = (Proc*)-1;
 	    unsort[nru].pid = pid;
 	    unsort[nru].ppid = ppid;
 	    unsort[nru].uid = st.st_uid;
@@ -132,12 +131,9 @@ shuffle()
     while (todo > 0)
 	for (i=0; i < nru; i++) {
 	    my = &unsort[i];
-	    if (my->parent == 0) {
+	    if (my->parent == (Proc*)-1) {
 		--todo;
-		if (my->pid == 1)  {
-		    my->parent = init = my;
-		}
-		else if (p = pfind(my->ppid)) {
+		if ( (my->pid != my->ppid) && ((p = pfind(my->ppid)) >= 0) ) {
 		    my->parent = p;
 
 		    if (p->child) {
@@ -164,7 +160,6 @@ ptree(int flags)
     if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
 
     nru = 0;
-    init = 0;
     if ( d = opendir(".") ) {
 	while (de = readdir(d))
 	    if ( ingest(de, flags) == -1 ) {
@@ -179,5 +174,5 @@ ptree(int flags)
 
     shuffle();
 
-    return init;
+    return pfind(1);
 }
