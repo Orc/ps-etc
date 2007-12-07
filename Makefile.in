@@ -2,7 +2,7 @@ CC=@CC@
 BINDIR=@exedir@
 MANDIR=@mandir@
 
-OBJS=pstree.o ptree.o
+OBJS=pstree.o ptree.o version.o
 PGM=pstree
 
 all: $(PGM)
@@ -16,6 +16,10 @@ install.man:
 
 pstree: $(OBJS)
 	$(CC) -o pstree $(OBJS)
+
+version.o: VERSION
+	echo 'char version[] = VERSION;' > version.c
+	$(CC) -DVERSION=\"`cat VERSION`\" -c version.c
 
 clean:
 	rm -f pstree *.o

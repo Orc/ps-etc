@@ -330,11 +330,12 @@ main(int argc, char **argv)
     Proc *newest;
     int opt;
     char *e;
+    extern char version[];
 
     argv[0] = basename(argv[0]);
 
     opterr = 1;
-    while ( (opt = getopt(argc, argv, "aclnpu")) != EOF )
+    while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
 	switch (opt) {
 	case 'a': showargs = 1; compress = 0; break;
 	case 'c': compress = 0; break;
@@ -342,6 +343,8 @@ main(int argc, char **argv)
 	case 'n': sortme = compress = 0; break;
 	case 'p': showpid  = 1; compress = 0; break;
 	case 'u': showuser = 1; break;
+	case 'V': printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
+	default : exit(1);
 	}
     init = ptree(showargs ? PTREE_ARGS : 0);
 
