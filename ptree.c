@@ -191,7 +191,7 @@ getprocesses(int flags)
 	}
     kvm_close(k);
 
-#else /*PROC*/
+#else /*USE_PROC*/
     DIR *d;
     struct dirent *de;
     

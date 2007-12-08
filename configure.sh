@@ -42,37 +42,42 @@ AC_CHECK_HEADERS pwd.h grp.h ctype.h
 # info via sysctl().    kvm_getprocs() access needs to be explicitly
 # requested because you have to be root to read the kernel image,
 # while /proc and sysctl() can be read by anyone.
-LOGN "process information comes from"
-unset _proc
-if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
-    if AC_QUIET AC_CHECK_FUNCS sysctl; then
-	if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h; then
-	    LOG " sysctl()"
-	    AC_DEFINE USE_SYSCTL
-	    _proc=sysctl
-	fi
-    fi
-fi
-if [ "$USE_KVM" ]; then
+
+icanhaskvm() {
     if AC_QUIET AC_CHECK_HEADERS kvm.h sys/param.h sys/sysctl.h; then
 	if LIBS=-lkvm AC_QUIET AC_CHECK_FUNCS kvm_getprocs; then
 	    LOG " kvm_getprocs()"
 	    AC_DEFINE USE_KVM
 	    AC_SUB 'MKSUID' 'chmod +s'
 	    _proc=kvm
-	AC_LIBS="$AC_LIBS -lkvm"
+	    AC_LIBS="$AC_LIBS -lkvm"
+	    return
 	fi
     fi
-else
-    unset USE_KVM
+}
+
+LOGN "get process information from"
+unset _proc
+
+test "$USE_KVM" && icanhaskvm
+
+if [ -z "$_proc" ]; then
+    if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
+	if AC_QUIET AC_CHECK_FUNCS sysctl; then
+	    if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h;then
+		AC_DEFINE USE_SYSCTL
+		_proc=sysctl
+	    fi
+	fi
+    fi > /dev/null
+
+    test "$_proc" = "sysctl" && LOG " sysctl()"
 fi
 
-if [ "_proc" != "kvm" ]; then
-    AC_SUB 'MKSUID' ':'
-fi
+test "$_proc" || icanhaskvm
 
 if test -z "$_proc"; then
-    LOG " /proc (default)"
+    LOGN " /proc"
     AC_DEFINE USE_PROC
 
     if [ "$OS_LINUX" ]; then
@@ -80,13 +85,20 @@ if test -z "$_proc"; then
 	AC_DEFINE STATSCANFOK 4
 	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' \
 		  'fscanf(f, "%d (%200s %c %d", p, n, s, pp)'
+	LOG " (linux -> /proc/*/stat)"
     elif [ "$OS_FREEBSD" ]; then
 	AC_DEFINE STATFILE \"status\"
 	AC_DEFINE STATSCANFOK 3
 	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' 'fscanf(f, "%s %d %d", n, p, pp)'
+	LOG " (freebsd -> /proc/*/status)"
     else
+	LOG " (not defined)"
 	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
+fi
+
+if [ "_proc" != "kvm" ]; then
+    AC_SUB 'MKSUID' ':'
 fi
 
 AC_DEFINE CONFDIR '"'$AC_CONFDIR'"'
