@@ -9,13 +9,14 @@ all: $(PGM)
 
 install: $(PGM)
 	@INSTALL_PROGRAM@ $(PGM) $(BINDIR)
+	@MKSUID@ $(BINDIR)/$(PGM)
 
 install.man:
 	@INSTALL_DIR@ $(MANDIR)/man1
 	@INSTALL_DATA@ pstree.1 $(MANDIR)/man1
 
 pstree: $(OBJS)
-	$(CC) -o pstree $(OBJS)
+	$(CC) -o pstree $(OBJS) @LIBS@
 
 version.o: VERSION
 	echo 'char version[] = VERSION;' > version.c

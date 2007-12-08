@@ -6,8 +6,7 @@
 # make certain that what you quote is what you want to quote.
 
 ac_help='
---with-posix-at		be more comparable with the rest of the Unix world
---with-spooldir		where at jobs are spooled (/var/spool/cron/atjobs)'
+--use-kvm		use kvm_getprocs() if at all possible'
 
 # load in the configuration file
 #
@@ -40,12 +39,53 @@ AC_CHECK_HEADERS pwd.h grp.h ctype.h
 [ "$OS_FREEBSD" -o "$OS_DRAGONFLY" ] || AC_CHECK_HEADERS malloc.h
 
 # check to see if we're on a platform that supports getting proc
-# info via sysctl()
-if AC_CHECK_HEADERS sys/sysctl.h; then
-    if AC_CHECK_FUNCS sysctl; then
-	if AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h; then
+# info via sysctl().    kvm_getprocs() access needs to be explicitly
+# requested because you have to be root to read the kernel image,
+# while /proc and sysctl() can be read by anyone.
+LOGN "process information comes from"
+unset _proc
+if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
+    if AC_QUIET AC_CHECK_FUNCS sysctl; then
+	if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h; then
+	    LOG " sysctl()"
 	    AC_DEFINE USE_SYSCTL
+	    _proc=sysctl
 	fi
+    fi
+fi
+if [ "$USE_KVM" ]; then
+    if AC_QUIET AC_CHECK_HEADERS kvm.h sys/param.h sys/sysctl.h; then
+	if LIBS=-lkvm AC_QUIET AC_CHECK_FUNCS kvm_getprocs; then
+	    LOG " kvm_getprocs()"
+	    AC_DEFINE USE_KVM
+	    AC_SUB 'MKSUID' 'chmod +s'
+	    _proc=kvm
+	AC_LIBS="$AC_LIBS -lkvm"
+	fi
+    fi
+else
+    unset USE_KVM
+fi
+
+if [ "_proc" != "kvm" ]; then
+    AC_SUB 'MKSUID' ':'
+fi
+
+if test -z "$_proc"; then
+    LOG " /proc (default)"
+    AC_DEFINE USE_PROC
+
+    if [ "$OS_LINUX" ]; then
+	AC_DEFINE STATFILE \"stat\"
+	AC_DEFINE STATSCANFOK 4
+	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' \
+		  'fscanf(f, "%d (%200s %c %d", p, n, s, pp)'
+    elif [ "$OS_FREEBSD" ]; then
+	AC_DEFINE STATFILE \"status\"
+	AC_DEFINE STATSCANFOK 3
+	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' 'fscanf(f, "%s %d %d", n, p, pp)'
+    else
+	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
 fi
 

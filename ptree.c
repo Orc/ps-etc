@@ -18,6 +18,11 @@
 
 #if USE_SYSCTL
 # include <sys/sysctl.h>
+#elif USE_KVM
+# include <kvm.h>
+# include <sys/param.h>
+# include <sys/user.h>
+# include <sys/sysctl.h>
 #endif
 
 #include "ptree.h"
@@ -51,7 +56,7 @@ another(char process[])
 }
 
 
-#if !USE_SYSCTL
+#if USE_PROC
 static int
 ingest(struct dirent *de, int flags)
 {
@@ -68,35 +73,20 @@ ingest(struct dirent *de, int flags)
 	if (!isdigit(*p))
 	    return 0;
 
-#ifdef OS_LINUX
-#define STATFILE "stat"
-#elif OS_FREEBSD
-#define STATFILE "status"
-#else
-#error "No support for this OS"
-#endif
-
     if (chdir(de->d_name) == 0) {
 	if ( (stat(".", &st) != 0) || !(f = fopen(STATFILE, "r")) ) {
 	    chdir("..");
 	    return 0;
 	}
-
-#ifdef OS_LINUX
-#define REQUIRED 4
-	ct = fscanf(f, "%d (%200s %c %d",  &pid, name, &status, &ppid);
+	ct = STATSCANF(f, &pid, &ppid, name, &status);
 	fclose(f);
 
+#ifdef OS_LINUX
 	if ( strlen(name) && (name[strlen(name)-1] == ')') )
 	    name[strlen(name)-1] = 0;
-#elif OS_FREEBSD
-#define REQUIRED 3
-	ct = fscanf(f, "%s %d %d", name, &pid, &ppid);
-#else
-# error "This OS is not supported (sorry!)"
 #endif
 
-	if ( ct == REQUIRED ) {
+	if ( ct == STATSCANFOK ) {
 
 	    if ( !(t = another(name)) ) return 0;
 
@@ -123,6 +113,106 @@ ingest(struct dirent *de, int flags)
     return 0;
 }
 #endif
+
+static int
+getprocesses(int flags)
+{
+#if USE_SYSCTL
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    struct kinfo_proc *job;
+    size_t jsize;
+    int njobs;
+    Proc *tj;
+    int i, rc = 0;
+
+    if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
+	return 0;
+
+    if ( !(job = malloc(jsize)) )
+	return 0;
+
+    if ( sysctl(mib, 4, job, &jsize, NULL, 0) != 0 ) {
+	free(job);
+	return 0;
+    }
+    
+    njobs = jsize / sizeof job[0];
+
+    for (i=0; i < njobs ; i++) {
+	if ( tj = another(job[i].kp_proc.p_comm) ) {
+	    tj->pid = job[i].kp_proc.p_pid;
+	    tj->ppid = job[i].kp_eproc.e_ppid;
+	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
+	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+	}
+	else {
+	    free(job);
+	    return 0;
+	}
+    }
+    free(job);
+#elif USE_KVM
+    struct kinfo_proc *job;
+    kvm_t *k;
+    Proc *tj;
+    int i, njobs;
+
+    if ( !(k = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, NULL)) )
+	return 0;
+
+    if ( !(job = kvm_getprocs(k, KERN_PROC_ALL, 0, &njobs)) ) {
+	kvm_close(k);
+	return 0;
+    }
+
+    for (i=0; i < njobs; i++)
+	if ( tj = another(job[i].kp_proc.p_comm) ) {
+	    tj->pid = job[i].kp_proc.p_pid;
+	    tj->ppid = job[i].kp_eproc.e_ppid;
+	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
+	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+
+	    if ( flags & PTREE_ARGS ) {
+		char **av;
+
+		if ( (av = kvm_getargv(k,&job[i],0)) && *av ) {
+		    CREATE(tj->cmdline);
+		    for ( ++av; *av; ++av) {
+			for ( ; **av; ++(*av) )
+			    EXPAND(tj->cmdline) = **av;
+			EXPAND(tj->cmdline) = 0;
+		    }
+		}
+	    }
+	}
+	else {
+	    kvm_close(k);
+	    return 0;
+	}
+    kvm_close(k);
+
+#else /*PROC*/
+    DIR *d;
+    struct dirent *de;
+    
+    int home = open(".", O_RDONLY);
+
+    if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
+
+    S(unsort) = 0;
+    if ( d = opendir(".") ) {
+	while (de = readdir(d))
+	    if ( ingest(de, flags) == -1 ) {
+		fchdir(home);
+		return 0;
+	    }
+	closedir(d);
+    }
+    fchdir(home);
+    close(home);
+#endif
+    return 1;
+}
 
 
 Proc *
@@ -191,61 +281,11 @@ shuffle()
 Proc *
 ptree(int flags)
 {
-#if USE_SYSCTL
-    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
-    struct kinfo_proc *job;
-    size_t jsize;
-    int njobs;
-    Proc *tj;
-    int i, rc = 0;
-
-    if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
-	return 0;
-
-    if ( !(job = malloc(jsize)) )
-	return 0;
-
-    if ( sysctl(mib, 4, job, &jsize, NULL, 0) != 0 ) {
-	free(job);
-	return 0;
-    }
-    
-    njobs = jsize / sizeof job[0];
-
     S(unsort) = 0;
-    for (i=0; i < njobs ; i++) {
-	if ( tj = another(job[i].kp_proc.p_comm) ) {
-	    tj->pid = job[i].kp_proc.p_pid;
-	    tj->ppid = job[i].kp_eproc.e_ppid;
-	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
-	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
-	}
-	else {
-	    free(job);
-	    return 0;
-	}
-    }
-    free(job);
-#else
-    DIR *d;
-    struct dirent *de;
-    
-    int home = open(".", O_RDONLY);
 
-    if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
+    if ( getprocesses(flags) == 0 )
+	return 0;
 
-    S(unsort) = 0;
-    if ( d = opendir(".") ) {
-	while (de = readdir(d))
-	    if ( ingest(de, flags) == -1 ) {
-		fchdir(home);
-		return 0;
-	    }
-	closedir(d);
-    }
-    fchdir(home);
-    close(home);
-#endif
     qsort(T(unsort), S(unsort), sizeof T(unsort)[0], compar);
 
     shuffle();

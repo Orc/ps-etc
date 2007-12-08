@@ -5,10 +5,10 @@
 #include <time.h>
 #include "cstring.h"
 
-typedef struct proc {
-    struct proc *parent;
-    struct proc *child;
-    struct proc *sib;
+typedef struct ptree_proc {
+    struct ptree_proc *parent;
+    struct ptree_proc *child;
+    struct ptree_proc *sib;
     int children;
     int sorted;
     pid_t pid, ppid;
