@@ -392,14 +392,19 @@ main(int argc, char **argv)
     opterr = 1;
     while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
 	switch (opt) {
-	case 'a': showargs = 1; compress = 0; break;
-	case 'c': compress = 0; break;
-	case 'l': clipping = 0; break;
-	case 'n': sortme = compress = 0; break;
-	case 'p': showpid  = 1; compress = 0; break;
-	case 'u': showuser = 1; break;
-	case 'V': printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
-	default : exit(1);
+	case 'a':
+#if !USE_SYSCTL
+		    showargs = 1;
+		    compress = 0;
+#endif
+		    break;
+	case 'c':   compress = 0; break;
+	case 'l':   clipping = 0; break;
+	case 'n':   sortme = compress = 0; break;
+	case 'p':   showpid  = 1; compress = 0; break;
+	case 'u':   showuser = 1; break;
+	case 'V':   printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
+	default :   exit(1);
 	}
     init = ptree(showargs ? PTREE_ARGS : 0);
 
