@@ -205,6 +205,7 @@ ptree(int flags)
     
     njobs = jsize / sizeof job[0];
 
+    S(unsort) = 0;
     for (i=0; i < njobs ; i++) {
 	tj = append(job[i].kp_proc.p_pid,
 		    job[i].kp_eproc.e_ppid,
@@ -227,7 +228,7 @@ ptree(int flags)
 
     if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
 
-    nru = 0;
+    S(unsort) = 0;
     if ( d = opendir(".") ) {
 	while (de = readdir(d))
 	    if ( ingest(de, flags) == -1 ) {
