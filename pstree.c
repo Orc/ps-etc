@@ -34,6 +34,42 @@ int sortme   = 1;	/* !-n: sort output */
 int showpid  = 0;	/* -p:  show process ids */
 int showuser = 0;	/* -u:  show username transitions */
 
+Proc * sibsort(Proc *);
+
+/* compare two ->child trees
+ */
+cmpchild(Proc *a, Proc *b)
+{
+    int rc;
+
+    if ( a && b ) {
+	if ( a->children != b->children )
+	    return a->children - b->children;
+
+	if ( !a->sorted ) {
+	    a->child = sibsort(a->child);
+	    a->sorted = 1;
+	}
+	if ( !b->sorted ) {
+	    b->child = sibsort(b->child);
+	    b->sorted = 1;
+	}
+
+	a = a->child;
+	b = b->child;
+
+	while ( a && b ) {
+	    if ( rc = cmp(a,b) )
+		return rc;
+	    a = a->sib;
+	    b = b->sib;
+	}
+    }
+    if ( a == b) return 0;
+    else if ( a ) return 1;
+    else return -1;
+}
+
 
 /* do a more macosish sort;  try to not pay attention to case when sorting.
  */
@@ -46,7 +82,7 @@ cmp(Proc *a, Proc *b)
 	rc = strcmp(a->process, b->process);
 
     if ( rc == 0 )
-	rc = a->children - b->children;
+	rc = cmpchild(a, b);
 
     if ( rc == 0 )
 	return a->pid - b->pid;
@@ -333,18 +369,27 @@ sameas(Proc *a, Proc *b, int walk)
 /* print() a subtree, indented by a header.
  */
 void
-print(int indent, Proc *node)
+print(int first, int count, Proc *node)
 {
-    int count = 0;
-    int first = 1;
-    char branch = '+';
+    int indent;
+    char branch;
 
-    if ( node == 0 ) {
+    indent = printjob(first,count,node);
+
+    if ( node->child ) {
+	if ( sortme && !node->sorted ) {
+	    node->child = sibsort(node->child);
+	    node->sorted = 1;
+	}
+	node = node->child;
+    }
+    else {
 	if ( !showargs ) eol();
 	return;
     }
-    if (sortme)
-	node = sibsort(node);
+
+    count = 0;
+    first = 1;
 
     do {
 	if ( compress && sameas(node, node->sib, 0) )
@@ -358,7 +403,7 @@ print(int indent, Proc *node)
 	    }
 	    if ( branch != ' ' && !node->sib) active('`');
 	    if ( count ) bo();
-	    print(printjob(first,count,node),node->child);
+	    print(first,count,node);
 	    if ( count ) bc();
 	    count=first=0;
 	}
@@ -372,7 +417,7 @@ userjobs(Proc *p, uid_t user)
 {
     for ( ; p ; p = p->sib )
 	if (p->uid == user)
-	    print(printjob(1,0,p),p->child);
+	    print(1,0,p);
 	else
 	    userjobs(p->child, user);
 }
@@ -417,7 +462,7 @@ main(int argc, char **argv)
     argv += optind;
 
     if ( argc < 1 ) {
-	print(printjob(1,0,init),init->child);
+	print(1,0,init);
 	exit(0);
     }
 
@@ -425,7 +470,7 @@ main(int argc, char **argv)
 
     if ( *e == 0 ) {
 	if ( init = pfind(curid) )
-	    print(printjob(1,0,init),init->child);
+	    print(1,0,init);
     }
     else {
 	struct passwd *pwd;

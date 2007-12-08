@@ -1,6 +1,9 @@
 /*
  * read the process table, build a linked list describing the
  * process heirarchy.
+ *
+ * There's a whole lot of sausage making going on in this
+ * module.
  */
 #include "config.h"
 
@@ -31,22 +34,19 @@ compar(void *c1, void *c2)
 }
 
 
+/* allocate and initialize a slot in the unsort array
+ */
 static Proc*
-append(pid_t pid, pid_t ppid, uid_t uid, gid_t gid,
-       time_t ctime, char status, char process[])
+another(char process[])
 {
     Proc *t = &EXPAND(unsort);
     
-    bzero(t, sizeof *t);
-    t->parent = (Proc*)-1;
-    t->children = -1;
-    t->pid = pid;
-    t->ppid = ppid;
-    t->uid = uid;
-    t->gid = gid;
-    t->ctime = ctime;
-    t->status = status;
-    strncpy(t->process, process, sizeof t->process);
+    if ( t ) {
+	bzero(t, sizeof *t);
+	t->parent = (Proc*)-1;
+	t->children = -1;
+	strncpy(t->process, process, sizeof t->process);
+    }
     return t;
 }
 
@@ -97,8 +97,15 @@ ingest(struct dirent *de, int flags)
 #endif
 
 	if ( ct == REQUIRED ) {
-	    t = append(pid,ppid,st.st_uid,st.st_gid,st.st_ctime,status,name);
-	    if ( !t ) return 0;
+
+	    if ( !(t = another(name)) ) return 0;
+
+	    t->pid = pid;
+	    t->ppid = ppid;
+	    t->uid = st.st_uid;
+	    t->gid = st.st_gid;
+	    t->ctime = st.st_ctime;
+	    t->status = status;
 
 	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
 		while ( (c = getc(f)) != EOF ) {
@@ -163,10 +170,10 @@ shuffle()
 		    my->parent = p;
 
 		    if (p->child) {
-			Proc *shuffle;
-			for (shuffle = p->child; shuffle->sib; shuffle = shuffle->sib)
+			Proc *nc;
+			for (nc = p->child; nc->sib; nc = nc->sib)
 			    ;
-			shuffle->sib = my;
+			nc->sib = my;
 		    }
 		    else
 			p->child = my;
@@ -207,14 +214,13 @@ ptree(int flags)
 
     S(unsort) = 0;
     for (i=0; i < njobs ; i++) {
-	tj = append(job[i].kp_proc.p_pid,
-		    job[i].kp_eproc.e_ppid,
-		    job[i].kp_eproc.e_pcred.p_ruid,
-		    job[i].kp_eproc.e_pcred.p_rgid,
-		    (time_t)0,
-		    'r',
-		    job[i].kp_proc.p_comm);
-	if ( !tj ) {
+	if ( tj = another(job[i].kp_proc.p_comm) ) {
+	    tj->pid = job[i].kp_proc.p_pid;
+	    tj->ppid = job[i].kp_eproc.e_ppid;
+	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
+	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+	}
+	else {
 	    free(job);
 	    return 0;
 	}
