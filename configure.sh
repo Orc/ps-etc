@@ -39,6 +39,16 @@ AC_CHECK_HEADERS pwd.h grp.h ctype.h
 
 [ "$OS_FREEBSD" -o "$OS_DRAGONFLY" ] || AC_CHECK_HEADERS malloc.h
 
+# check to see if we're on a platform that supports getting proc
+# info via sysctl()
+if AC_CHECK_HEADERS sys/sysctl.h; then
+    if AC_CHECK_FUNCS sysctl; then
+	if AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h; then
+	    AC_DEFINE USE_SYSCTL
+	fi
+    fi
+fi
+
 AC_DEFINE CONFDIR '"'$AC_CONFDIR'"'
 
 AC_OUTPUT Makefile

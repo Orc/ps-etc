@@ -259,6 +259,9 @@ printjob(int first, int count, Proc *p)
 
     tind += printf("%s", p->process);
 
+    if ( showpid )
+	tind += po() + printf("%d", p->pid);
+
     if ( showuser && p->parent && (p->uid != p->parent->uid) ) {
 	struct passwd *pw = getpwuid(p->uid);
 
@@ -268,8 +271,6 @@ printjob(int first, int count, Proc *p)
 	else
 	    tind += printf("#%d", p->uid);
     }
-    if ( showuser )
-	tind += po() + printf("%d", p->children);
 
     tind += pc();
 
@@ -401,6 +402,11 @@ main(int argc, char **argv)
 	default : exit(1);
 	}
     init = ptree(showargs ? PTREE_ARGS : 0);
+
+    if ( !init ) {
+	perror(argv[0]);
+	exit(1);
+    }
 
     argc -= optind;
     argv += optind;

@@ -13,11 +13,13 @@
 #include <ctype.h>
 #include <string.h>
 
+#if USE_SYSCTL
+# include <sys/sysctl.h>
+#endif
+
 #include "ptree.h"
 
-static Proc *unsort = 0;
-static int szu = 0;
-static int nru = 0;
+static STRING(Proc) unsort = { 0 };
 
 static int
 compar(void *c1, void *c2)
@@ -29,16 +31,37 @@ compar(void *c1, void *c2)
 }
 
 
+static Proc*
+append(pid_t pid, pid_t ppid, uid_t uid, gid_t gid,
+       time_t ctime, char status, char process[])
+{
+    Proc *t = &EXPAND(unsort);
+    
+    bzero(t, sizeof *t);
+    t->parent = (Proc*)-1;
+    t->children = -1;
+    t->pid = pid;
+    t->ppid = ppid;
+    t->uid = uid;
+    t->gid = gid;
+    t->ctime = ctime;
+    t->status = status;
+    strncpy(t->process, process, sizeof t->process);
+    return t;
+}
+
+
+#if !USE_SYSCTL
 static int
 ingest(struct dirent *de, int flags)
 {
     FILE *f;
+    Proc *t;
     char *p;
-    int ct;
-    int c;
+    int ct, c, rc;
     pid_t pid, ppid;
     char status;
-    char process[200];
+    char name[200];
     struct stat st;
 
     for (p = de->d_name; *p; ++p)
@@ -61,54 +84,38 @@ ingest(struct dirent *de, int flags)
 
 #ifdef OS_LINUX
 #define REQUIRED 4
-	ct = fscanf(f, "%d (%200s %c %d",  &pid, process, &status, &ppid);
+	ct = fscanf(f, "%d (%200s %c %d",  &pid, name, &status, &ppid);
 	fclose(f);
 
-	if ( strlen(process) && (process[strlen(process)-1] == ')') )
-	    process[strlen(process)-1] = 0;
+	if ( strlen(name) && (name[strlen(name)-1] == ')') )
+	    name[strlen(name)-1] = 0;
 #elif OS_FREEBSD
 #define REQUIRED 3
-	ct = fscanf(f, "%s %d %d", process, &pid, &ppid);
+	ct = fscanf(f, "%s %d %d", name, &pid, &ppid);
 #else
 # error "This OS is not supported (sorry!)"
 #endif
 
 	if ( ct == REQUIRED ) {
-	    if (nru >= szu) {
-		szu = 10 + (szu*10);
-		unsort = unsort ? realloc(unsort, szu * sizeof(*unsort) ) : malloc( szu * sizeof(*unsort) );
-		if (unsort == 0) {
-		    szu = nru = 0;
-		    return -1;
-		}
-	    }
-	    bzero(&unsort[nru], sizeof unsort[nru]);
-	    unsort[nru].parent = (Proc*)-1;
-	    unsort[nru].children = -1;
-	    unsort[nru].pid = pid;
-	    unsort[nru].ppid = ppid;
-	    unsort[nru].uid = st.st_uid;
-	    unsort[nru].gid = st.st_gid;
-	    unsort[nru].ctime = st.st_ctime;
-	    unsort[nru].status = status;
-	    strncpy(unsort[nru].process, process, sizeof unsort[nru].process);
+	    t = append(pid,ppid,st.st_uid,st.st_gid,st.st_ctime,status,name);
+	    if ( !t ) return 0;
 
 	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
 		while ( (c = getc(f)) != EOF ) {
-		    if ( T(unsort[nru].cmdline) )
-			EXPAND(unsort[nru].cmdline) = c;
+		    if ( T(t->cmdline) )
+			EXPAND(t->cmdline) = c;
 		    else if ( c == 0 )
-			CREATE(unsort[nru].cmdline);
+			CREATE(t->cmdline);
 		}
 		fclose(f);
 	    }
-	    nru++;
 	}
 	chdir("..");
-	return nru;
+	return S(unsort);
     }
     return 0;
 }
+#endif
 
 
 Proc *
@@ -118,7 +125,7 @@ pfind(pid_t pid)
 
     key.pid = pid;
 
-    return bsearch(&key, unsort, nru, sizeof unsort[0], compar);
+    return bsearch(&key, T(unsort), S(unsort), sizeof T(unsort)[0], compar);
 }
 
 
@@ -143,13 +150,13 @@ children(Proc *p, int countsibs)
 static void
 shuffle()
 {
-    int todo = nru;
+    int todo = S(unsort);
     int i;
     Proc *p, *my;
 
     while (todo > 0)
-	for (i=0; i < nru; i++) {
-	    my = &unsort[i];
+	for (i=0; i < S(unsort); i++) {
+	    my = &T(unsort)[i];
 	    if (my->parent == (Proc*)-1) {
 		--todo;
 		if ( (my->pid != my->ppid) && (p = pfind(my->ppid)) ) {
@@ -169,16 +176,53 @@ shuffle()
 	    }
 	}
 
-    for (i=0; i < nru; i++)
-	unsort[i].children = children(&unsort[i], 0);
+    for (i=0; i < S(unsort); i++)
+	T(unsort)[i].children = children(&T(unsort)[i], 0);
 }
 
 
 Proc *
 ptree(int flags)
 {
+#if USE_SYSCTL
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    struct kinfo_proc *job;
+    size_t jsize;
+    int njobs;
+    Proc *tj;
+    int i, rc = 0;
+
+    if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
+	return 0;
+
+    if ( !(job = malloc(jsize)) )
+	return 0;
+
+    if ( sysctl(mib, 4, job, &jsize, NULL, 0) != 0 ) {
+	free(job);
+	return 0;
+    }
+    
+    njobs = jsize / sizeof job[0];
+
+    for (i=0; i < njobs ; i++) {
+	tj = append(job[i].kp_proc.p_pid,
+		    job[i].kp_eproc.e_ppid,
+		    job[i].kp_eproc.e_pcred.p_ruid,
+		    job[i].kp_eproc.e_pcred.p_rgid,
+		    (time_t)0,
+		    'r',
+		    job[i].kp_proc.p_comm);
+	if ( !tj ) {
+	    free(job);
+	    return 0;
+	}
+    }
+    free(job);
+#else
     DIR *d;
     struct dirent *de;
+    
     int home = open(".", O_RDONLY);
 
     if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
@@ -191,10 +235,11 @@ ptree(int flags)
 		return 0;
 	    }
 	closedir(d);
-	qsort(unsort, nru, sizeof unsort[0], compar);
     }
     fchdir(home);
     close(home);
+#endif
+    qsort(T(unsort), S(unsort), sizeof T(unsort)[0], compar);
 
     shuffle();
 
