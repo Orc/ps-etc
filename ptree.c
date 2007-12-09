@@ -118,13 +118,18 @@ static int
 getprocesses(int flags)
 {
 #if USE_SYSCTL
-    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    int mib[4] = { CTL_KERN };
     struct kinfo_proc *job;
     size_t jsize;
     int njobs;
     Proc *tj;
     int i, rc = 0;
+    static char *args = 0;
+    size_t argsize;
 
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_ALL;
+    mib[3] = 0;
     if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
 	return 0;
 
@@ -144,6 +149,36 @@ getprocesses(int flags)
 	    tj->ppid = job[i].kp_eproc.e_ppid;
 	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
 	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+
+	    if ( flags & PTREE_ARGS ) {
+		if ( !args )
+		    args = malloc(1);
+
+		mib[1] = KERN_PROCARGS2;
+		mib[2] = tj->pid;
+
+		if ( sysctl(mib,3,NULL,&argsize,NULL,0) == 0 ) {
+		    int argc;
+		    char *args;
+
+		    if ( args = realloc(args,argsize) ) {
+			sysctl(mib,3,args,&argsize,NULL,0);
+
+			memcpy(&argc, args, sizeof argc);
+			args += sizeof argc;
+			args += strlen(args)+1;	/* skip process name */
+			args += strlen(args)+1;	/* skip argv[0] */
+
+			CREATE(tj->cmdline);
+			while (argc > 1) {
+			    while (*args)
+				EXPAND(tj->cmdline) = *args++;
+			    if (--argc)
+				EXPAND(tj->cmdline) = *args++;
+			}
+		    }
+		}
+	    }
 	}
 	else {
 	    free(job);

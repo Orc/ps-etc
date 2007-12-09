@@ -49,36 +49,31 @@ icanhaskvm() {
 	    LOG " kvm_getprocs()"
 	    AC_DEFINE USE_KVM
 	    AC_SUB 'MKSUID' 'chmod +s'
-	    _proc=kvm
 	    AC_LIBS="$AC_LIBS -lkvm"
-	    return
+	    return 0
 	fi
     fi
+    return 1
 }
 
-LOGN "get process information from"
-unset _proc
-
-test "$USE_KVM" && icanhaskvm
-
-if [ -z "$_proc" ]; then
+icanhassysctl() {
     if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
 	if AC_QUIET AC_CHECK_FUNCS sysctl; then
 	    if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h;then
+		LOG " sysctl()"
 		AC_DEFINE USE_SYSCTL
-		_proc=sysctl
+	        AC_SUB 'MKSUID' 'chmod +s'
+		return 0
 	    fi
 	fi
-    fi > /dev/null
+    fi
+    return 1
+}
 
-    test "$_proc" = "sysctl" && LOG " sysctl()"
-fi
-
-test "$_proc" || icanhaskvm
-
-if test -z "$_proc"; then
+icanhasproc() {
     LOGN " /proc"
     AC_DEFINE USE_PROC
+    AC_SUB 'MKSUID' ':'
 
     if [ "$OS_LINUX" ]; then
 	AC_DEFINE STATFILE \"stat\"
@@ -95,10 +90,14 @@ if test -z "$_proc"; then
 	LOG " (not defined)"
 	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
-fi
+}
 
-if [ "_proc" != "kvm" ]; then
-    AC_SUB 'MKSUID' ':'
+LOGN "get process information from"
+
+if "$USE_KVM"; then
+    icanhaskvm || icanhassysctl || icanhasproc
+else
+    icanhassysctl || icanhaskvm || icanhasproc
 fi
 
 AC_DEFINE CONFDIR '"'$AC_CONFDIR'"'
