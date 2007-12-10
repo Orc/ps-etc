@@ -31,4 +31,4 @@ distclean spotless: clean
 
 pstree.o: pstree.c config.h ptree.h cstring.h
 ptree.o: ptree.c config.h ptree.h cstring.h
-card.o: card.c
+card.o: card.c config.h

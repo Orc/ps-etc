@@ -34,7 +34,12 @@ if AC_CHECK_FUNCS basename; then
     AC_CHECK_HEADERS libgen.h
 fi
 
-AC_CHECK_HEADERS pwd.h grp.h ctype.h
+AC_CHECK_HEADERS pwd.h
+AC_CHECK_HEADERS grp.h
+AC_CHECK_HEADERS ctype.h
+AC_CHECK_HEADERS termios.h
+AC_CHECK_HEADERS termio.h
+AC_CHECK_HEADERS sgtty.h
 
 [ "$OS_FREEBSD" -o "$OS_DRAGONFLY" ] || AC_CHECK_HEADERS malloc.h
 

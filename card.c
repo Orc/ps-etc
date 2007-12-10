@@ -1,6 +1,16 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/ioctl.h>
+
+#ifdef HAVE_TERMIOS_H
+# include <termios.h>
+#elif HAVE_TERMIO_H
+# include <termio.h>
+#elif HAVE_SGTTY_H
+# include <sgtty.h>
+#endif
 
 #include "cstring.h"
 
