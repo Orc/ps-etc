@@ -1,0 +1,22 @@
+PSTREE is a clone of the standard Linux pstree command, which displays
+process information in a heirarchical fashion.   It builds and runs on
+SLS linux, FreeBSD 4.4, FreeBSD 4.8, and MacOS 10.0.4.   Unlike the
+standard pstree, it uses either sysctl() [macOS 10.0.4], kvm_getprocs()
+[FreeBSD 4.?] or /proc [SLS linux] as needed.
+
+PSTREE is free software;  it is released under a BSD-style license
+that allows you to do as you wish with it as long as you don't attempt
+to claim it as your own work.
+
+To install pstree, do
+
+	./configure.sh		(./configure.sh --help explains options)
+
+	make
+
+	make install		(as root)
+
+
+If pstree needs to use sysctl() or kvm_getprocs() to read process
+information, it will be installed as a setuid process to allow
+it to read all of the process data.
