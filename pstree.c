@@ -446,6 +446,7 @@ main(int argc, char **argv)
 	case 'V':   printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
 	default :   exit(1);
 	}
+
     init = ptree(showargs ? PTREE_ARGS : 0);
 
     if ( !init ) {
