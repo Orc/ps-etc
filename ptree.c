@@ -118,16 +118,13 @@ static int
 getprocesses(int flags)
 {
 #if USE_SYSCTL
-    int mib[4] = { CTL_KERN };
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
     struct kinfo_proc *job;
     size_t jsize;
     int njobs;
     Proc *tj;
     int i, rc = 0;
 
-    mib[1] = KERN_PROC;
-    mib[2] = KERN_PROC_ALL;
-    mib[3] = 0;
     if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
 	return 0;
 
@@ -147,6 +144,7 @@ getprocesses(int flags)
 	    tj->ppid = job[i].kp_eproc.e_ppid;
 	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
 	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+<<<<<<< HEAD:ptree.c
 
 	    if ( flags & PTREE_ARGS ) {
 		struct {
@@ -181,6 +179,8 @@ getprocesses(int flags)
 	    overflow: ;
 		}
 	    }
+=======
+>>>>>>> 2e5f6e574094ab63ce88b961965d3a2c726d5aeb:ptree.c
 	}
 	else {
 	    free(job);
