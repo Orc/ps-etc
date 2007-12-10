@@ -437,12 +437,7 @@ main(int argc, char **argv)
     opterr = 1;
     while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
 	switch (opt) {
-	case 'a':
-#if !USE_SYSCTL
-		    showargs = 1;
-		    compress = 0;
-#endif
-		    break;
+	case 'a':   showargs = 1; compress = 0; break;
 	case 'c':   compress = 0; break;
 	case 'l':   clipping = 0; break;
 	case 'n':   sortme = compress = 0; break;
