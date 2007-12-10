@@ -1,0 +1,73 @@
+#include <stdio.h>
+#include <stdarg.h>
+#include <sys/ioctl.h>
+
+#include "cstring.h"
+
+static STRING(char) line;
+
+
+int
+printcard(char *fmt, ...)
+{
+    int size;
+    va_list ptr;
+
+    va_start(ptr,fmt);
+
+    if ( T(line) ) {
+	size = vsnprintf(T(line)+S(line),line.alloc-S(line), fmt, ptr);
+	if (size >= 0)
+	    S(line) += size;
+    }
+    else
+	size = vprintf(fmt, ptr);
+
+    va_end(ptr);
+
+    return size;
+}
+
+
+int
+putcard(char c)
+{
+    if ( !T(line) )
+	putchar(c);
+    else if ( S(line) < line.alloc )
+	EXPAND(line) = c;
+
+    return 1;
+}
+
+
+void
+ejectcard()
+{
+    if (T(line)) {
+	fwrite(T(line), S(line), 1, stdout);
+	S(line) = 0;
+    }
+    putchar('\n');
+}
+
+
+void
+cardwidth()
+{
+    int width = 80;
+
+#if defined(TIOCGSIZE)
+    struct ttysize tty;
+    if (ioctl(0, TIOCGSIZE, &tty) == 0) {
+	if (tty.ts_cols)  width=tty.ts_cols;
+    }
+#elif defined(TIOCGWINSZ)
+    struct winsize tty;
+    if (ioctl(0, TIOCGWINSZ, &tty) == 0) {
+	if (tty.ws_col) width=tty.ws_col;
+    }
+#endif
+    RESERVE(line, width);
+    S(line) = 0;
+}

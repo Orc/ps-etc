@@ -2,7 +2,7 @@ CC=@CC@
 BINDIR=@exedir@
 MANDIR=@mandir@
 
-OBJS=pstree.o ptree.o version.o
+OBJS=pstree.o ptree.o version.o card.o
 PGM=pstree
 
 all: $(PGM)
@@ -31,3 +31,4 @@ distclean spotless: clean
 
 pstree.o: pstree.c config.h ptree.h cstring.h
 ptree.o: ptree.c config.h ptree.h cstring.h
+card.o: card.c

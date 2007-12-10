@@ -27,6 +27,10 @@ basename(char *p)
 #endif
 
 
+extern int  printcard(char *,...);
+extern void ejectcard();
+extern void cardwidth();
+
 int showargs = 0;	/* -a:  show the entire command line */
 int compress = 1;	/* !-c: compact duplicate subtrees */
 int clipping = 1;	/* !-l: clip output to screenwidth */
@@ -157,9 +161,9 @@ int
 po()
 {
     if (_paren)
-	return printf(",");
+	return putcard(',');
     _paren = 1;
-    return printf("(");
+    return putcard('(');
 }
 
 
@@ -168,7 +172,7 @@ pc()
 {
     if (_paren) {
 	_paren = 0;
-	return printf(")");
+	return putcard(')');
     }
     return 0;
 }
@@ -194,8 +198,8 @@ eol()
     int i;
 
     for (i=0; i < _bracket; i++)
-	putchar(']');
-    putchar('\n');
+	putcard(']');
+    ejectcard();
 }
 
 
@@ -262,15 +266,13 @@ peek()
 void
 dle()
 {
-    int i, xp, dsp;
+    int dx, xp, dsp;
     char c;
 
-    for ( xp = i = dsp = 0; dsp < tsp; dsp++ ) {
-	while ( xp < T(stack)[dsp].column ) {
-	    ++xp;
-	    putchar(' ');
-	}
-	putchar(T(stack)[dsp].active);
+    for ( xp = dsp = 0; dsp < tsp; dsp++ ) {
+	dx = T(stack)[dsp].column - xp;
+	printcard("%*s%c", dx, "", T(stack)[dsp].active);
+	xp = T(stack)[dsp].column;
 	if ( T(stack)[dsp].active == '`' )
 	    T(stack)[dsp].active = ' ';
     }
@@ -289,23 +291,23 @@ printjob(int first, int count, Proc *p)
     if ( showargs || !first ) dle();
 
     if ( count )
-	tind = printf("-%d*[", 1+count);
+	tind = printcard("-%d*[", 1+count);
     else if ( tsp )
-	tind = printf("-");
+	tind = putcard('-');
 
-    tind += printf("%s", p->process);
+    tind += printcard("%s", p->process);
 
     if ( showpid )
-	tind += po() + printf("%d", p->pid);
+	tind += po() + printcard("%d", p->pid);
 
     if ( showuser && p->parent && (p->uid != p->parent->uid) ) {
 	struct passwd *pw = getpwuid(p->uid);
 
 	tind += po();
 	if ( pw )
-	    tind += printf("%s", pw->pw_name);
+	    tind += printcard("%s", pw->pw_name);
 	else
-	    tind += printf("#%d", p->uid);
+	    tind += printcard("#%d", p->uid);
     }
 
     tind += pc();
@@ -314,22 +316,22 @@ printjob(int first, int count, Proc *p)
 	if ( T(p->cmdline) ) {
 	    unsigned int i, c;
 
-	    putchar(' ');
+	    putcard(' ');
 	    for (i=0; i < S(p->cmdline); i++) {
 		c = T(p->cmdline)[i];
 
 		if ( c == 0 )
-		    putchar(' ');
+		    putcard(' ');
 		else if ( c <= ' ' || !isprint(c) )
-		    printf("\\\%03o", c);
+		    printcard("\\\%03o", c);
 		else
-		    putchar(c);
+		    putcard(c);
 	    }
 	}
 	eol();
     }
     else if ( p->child ) {
-	putchar('-');
+	putcard('-');
 	tind++;
     }
     return tind;
@@ -397,7 +399,7 @@ print(int first, int count, Proc *node)
 	else {
 	    if ( first ) {
 		if ( !showargs )
-		    putchar( node->sib ? '+' : '-' );
+		    putcard(node->sib ? '+' : '-' );
 		branch = node->sib ? '|' : ' ';
 		push(peek() + (showargs ? 2 : indent), branch);
 	    }
@@ -453,6 +455,9 @@ main(int argc, char **argv)
 	perror(argv[0]);
 	exit(1);
     }
+
+    if ( clipping )
+	cardwidth();
 
     argc -= optind;
     argv += optind;
