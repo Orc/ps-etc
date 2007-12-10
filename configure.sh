@@ -46,7 +46,7 @@ AC_CHECK_HEADERS pwd.h grp.h ctype.h
 icanhaskvm() {
     if AC_QUIET AC_CHECK_HEADERS kvm.h sys/param.h sys/sysctl.h; then
 	if LIBS=-lkvm AC_QUIET AC_CHECK_FUNCS kvm_getprocs; then
-	    LOG " via kvm_getprocs()"
+	    LOG " kvm_getprocs()"
 	    AC_DEFINE USE_KVM
 	    AC_SUB 'MKSUID' 'chmod +s'
 	    _proc=kvm
@@ -56,23 +56,29 @@ icanhaskvm() {
     fi
 }
 
-icanhassysctl() {
+LOGN "get process information from"
+unset _proc
+
+test "$USE_KVM" && icanhaskvm
+
+if [ -z "$_proc" ]; then
     if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
 	if AC_QUIET AC_CHECK_FUNCS sysctl; then
 	    if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h;then
-		LOG " via sysctl()"
 		AC_DEFINE USE_SYSCTL
-		AC_SUB 'MKSUID' 'chmod +s'
 		_proc=sysctl
 	    fi
 	fi
-    fi
-}
+    fi > /dev/null
 
-icanhasproc() {
-    LOGN " from /proc"
+    test "$_proc" = "sysctl" && LOG " sysctl()"
+fi
+
+test "$_proc" || icanhaskvm
+
+if test -z "$_proc"; then
+    LOGN " /proc"
     AC_DEFINE USE_PROC
-    AC_SUB 'MKSUID' ':'
 
     if [ "$OS_LINUX" ]; then
 	AC_DEFINE STATFILE \"stat\"
@@ -89,16 +95,11 @@ icanhasproc() {
 	LOG " (not defined)"
 	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
-}
-
-LOGN "get process information"
-
-if [ -z "$USE_KVM" ]; then
-    icanhassysctl || icanhaskvm || icanhasproc
-else
-    icanhaskvm || icanhassysctl || icanhasproc
 fi
 
+if [ "_proc" != "kvm" ]; then
+    AC_SUB 'MKSUID' ':'
+fi
 
 AC_DEFINE CONFDIR '"'$AC_CONFDIR'"'
 
