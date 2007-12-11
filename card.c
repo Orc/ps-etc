@@ -27,8 +27,7 @@ printcard(char *fmt, ...)
 
     if ( T(line) ) {
 	size = vsnprintf(T(line)+S(line),line.alloc-S(line), fmt, ptr);
-	if (size >= 0)
-	    S(line) += size;
+	S(line) += size;
     }
     else
 	size = vprintf(fmt, ptr);
@@ -55,7 +54,10 @@ void
 ejectcard()
 {
     if (T(line)) {
-	fwrite(T(line), S(line), 1, stdout);
+	int len = S(line);
+
+	if (len >= line.alloc) len = line.alloc-1;
+	fwrite(T(line), len, 1, stdout);
 	S(line) = 0;
     }
     putchar('\n');
@@ -78,6 +80,6 @@ cardwidth()
 	if (tty.ws_col) width=tty.ws_col;
     }
 #endif
-    RESERVE(line, width);
+    RESERVE(line, width+1);
     S(line) = 0;
 }
