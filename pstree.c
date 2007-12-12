@@ -81,10 +81,23 @@ cmpchild(Proc *a, Proc *b)
 int
 cmp(Proc *a, Proc *b)
 {
-    int rc = strcasecmp(a->process, b->process);
+    int rc;
+    char *aproc, *bproc;
+
+    if ( showargs && S(a->cmdline) && T(a->cmdline)[0] )
+	aproc = T(a->cmdline);
+    else
+	aproc = a->process;
+
+    if ( showargs && S(b->cmdline) && T(b->cmdline)[0] )
+	bproc = T(b->cmdline);
+    else
+	bproc = b->process;
+
+    rc = strcasecmp(aproc, bproc);
 
     if ( rc == 0 )
-	rc = strcmp(a->process, b->process);
+	rc = strcmp(aproc, bproc);
 
     if ( rc == 0 )
 	rc = cmpchild(a, b);
@@ -280,6 +293,25 @@ dle()
 }
 
 
+/* print a string, expanding unusual characters to \ooo escapes
+ */
+int
+prints(unsigned char *s, int len)
+{
+    int siz, c;
+
+    for (siz=0; len > 0; --len, ++s) {
+	if ( !(c = *s) )
+	    siz += putcard(' ');
+	else if ( isprint(c) && (c > ' ') )
+	    siz += putcard(*s);
+	else
+	    siz += printcard("\\%03o", c);
+    }
+    return siz;
+}
+
+
 /* print process information (process name, id, uid translation)
  * and branch prefixes and suffixes.   Returns the # of characters
  * printed, so print() can adjust the indent for subtrees
@@ -305,7 +337,7 @@ printjob(int first, int count, Proc *p)
     if ( !showargpath &&  (qa = strrchr(pa, '/')) )
 	pa = 1+qa;
     
-    tind += printcard("%s", pa);
+    tind += prints(pa, strlen(pa));
 
     if ( showpid )
 	tind += po() + printcard("%d", p->pid);
@@ -323,21 +355,12 @@ printjob(int first, int count, Proc *p)
     tind += pc();
 
     if ( showargs ) {
-	unsigned int i, c;
-	
-	for ( i=0; i < S(p->cmdline); i++ )
-	    if ( !T(p->cmdline)[i] )
-		break;
+	int i;
 
-	for ( ; i < S(p->cmdline) ; i++ ) {
-	    c = T(p->cmdline)[i];
-	    if ( c == 0 )
-		putcard(' ');
-	    else if ( c <= ' ' || !isprint(c) )
-		printcard("\\\%03o", c);
-	    else
-		putcard(c);
-	}
+	for ( i=0; T(p->cmdline)[i]; ++i)
+	    ;
+
+	prints(T(p->cmdline) + i, S(p->cmdline) - i);
 	eol();
     }
     else if ( p->child ) {
