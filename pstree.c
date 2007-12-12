@@ -355,12 +355,14 @@ printjob(int first, int count, Proc *p)
     tind += pc();
 
     if ( showargs ) {
-	int i;
+	if ( S(p->cmdline) ) {
+	    int i;
 
-	for ( i=0; T(p->cmdline)[i]; ++i)
-	    ;
+	    for ( i=0; T(p->cmdline)[i]; ++i)
+		;
 
-	prints(T(p->cmdline) + i, S(p->cmdline) - i);
+	    prints(T(p->cmdline) + i, S(p->cmdline) - i);
+	}
 	eol();
     }
     else if ( p->child ) {
