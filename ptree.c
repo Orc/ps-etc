@@ -98,12 +98,9 @@ ingest(struct dirent *de, int flags)
 	    t->status = status;
 
 	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
-		while ( (c = getc(f)) != EOF ) {
-		    if ( T(t->cmdline) )
-			EXPAND(t->cmdline) = c;
-		    else if ( c == 0 )
-			CREATE(t->cmdline);
-		}
+		CREATE(t->cmdline);
+		while ( (c = getc(f)) != EOF )
+		    EXPAND(t->cmdline) = c;
 		fclose(f);
 	    }
 	}
@@ -188,17 +185,16 @@ getprocesses(int flags)
 
 		    p = skipz(p, end);
 		    p = skip (p, end);/* executable name */
-		    p = skip (p, end);/* argv[0] */
 
-		    if ( !p ) goto overflow;
-		    
-		    CREATE(tj->cmdline);
-		    while (args.count-- > 1) {
-			do {
-			    if ( p >= end )
-				goto overflow;
-			    EXPAND(tj->cmdline) = *p;
-			} while (*p++);
+		    if ( p ) {
+			CREATE(tj->cmdline);
+			while (args.count-- > 0) {
+			    do {
+				if ( p >= end )
+				    goto overflow;
+				EXPAND(tj->cmdline) = *p;
+			    } while (*p++);
+			}
 		    }
 	    overflow: ;
 		}
@@ -236,7 +232,7 @@ getprocesses(int flags)
 
 		if ( (av = kvm_getargv(k,&job[i],0)) && *av ) {
 		    CREATE(tj->cmdline);
-		    for ( ++av; *av; ++av) {
+		    for ( ; *av; ++av) {
 			do {
 			    EXPAND(tj->cmdline) = **av;
 			} while ( *(*av)++ );

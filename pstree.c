@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/types.h>
-
+#include <string.h>
 #include <unistd.h>
 #if HAVE_LIBGEN_H
 # include <libgen.h>
@@ -32,6 +32,7 @@ extern void ejectcard();
 extern void cardwidth();
 
 int showargs = 0;	/* -a:  show the entire command line */
+int showargpath = 0;	/* -A:  but show full pathname of argv[0] */
 int compress = 1;	/* !-c: compact duplicate subtrees */
 int clipping = 1;	/* !-l: clip output to screenwidth */
 int sortme   = 1;	/* !-n: sort output */
@@ -287,6 +288,7 @@ int
 printjob(int first, int count, Proc *p)
 {
     int tind = 0;
+    char *pa, *qa;
 
     if ( showargs || !first ) dle();
 
@@ -295,7 +297,15 @@ printjob(int first, int count, Proc *p)
     else if ( tsp )
 	tind = putcard('-');
 
-    tind += printcard("%s", p->process);
+    if ( showargs && S(p->cmdline) )
+	pa = T(p->cmdline);
+    else
+	pa = p->process;
+    
+    if ( !showargpath &&  (qa = strrchr(pa, '/')) )
+	pa = 1+qa;
+    
+    tind += printcard("%s", pa);
 
     if ( showpid )
 	tind += po() + printcard("%d", p->pid);
@@ -313,20 +323,20 @@ printjob(int first, int count, Proc *p)
     tind += pc();
 
     if ( showargs ) {
-	if ( T(p->cmdline) ) {
-	    unsigned int i, c;
+	unsigned int i, c;
+	
+	for ( i=0; i < S(p->cmdline); i++ )
+	    if ( !T(p->cmdline)[i] )
+		break;
 
-	    putcard(' ');
-	    for (i=0; i < S(p->cmdline); i++) {
-		c = T(p->cmdline)[i];
-
-		if ( c == 0 )
-		    putcard(' ');
-		else if ( c <= ' ' || !isprint(c) )
-		    printcard("\\\%03o", c);
-		else
-		    putcard(c);
-	    }
+	for ( ; i < S(p->cmdline) ; i++ ) {
+	    c = T(p->cmdline)[i];
+	    if ( c == 0 )
+		putcard(' ');
+	    else if ( c <= ' ' || !isprint(c) )
+		printcard("\\\%03o", c);
+	    else
+		putcard(c);
 	}
 	eol();
     }
@@ -437,8 +447,9 @@ main(int argc, char **argv)
     argv[0] = basename(argv[0]);
 
     opterr = 1;
-    while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
+    while ( (opt = getopt(argc, argv, "aAclnpuV")) != EOF )
 	switch (opt) {
+	case 'A':   showargpath = 1; break;
 	case 'a':   showargs = 1; compress = 0; break;
 	case 'c':   compress = 0; break;
 	case 'l':   clipping = 0; break;

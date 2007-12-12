@@ -8,7 +8,7 @@
 .Nd display a process heirarchy
 .Sh SYNOPSIS
 .Nm
-.Op Fl aclnpu
+.Op Fl aAclnpu
 .Op Ar pid No | Ar user
 .Sh DESCRIPTION
 The
@@ -29,6 +29,8 @@ The options are as follows:
 .Bl -tag -width aaa
 .It Fl a
 Show the command line for each process.
+.It Fl A
+Show the full pathname for each process.
 .It Fl c
 Don't collapse idential subtrees.
 .It Fl l
