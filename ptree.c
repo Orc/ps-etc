@@ -114,17 +114,42 @@ ingest(struct dirent *de, int flags)
 }
 #endif
 
+
+#if USE_SYSCTL
+static char *
+skipz(char *p, char *end)
+{
+    if ( p )
+	while ( (p < end) && !*p )
+	    ++p;
+    return p;
+}
+
+static char *
+skip(char *p, char *end)
+{
+    if ( p )
+	while ( (p < end) && *p )
+	    ++p;
+    return skipz(p,end);
+}
+#endif
+
+
 static int
 getprocesses(int flags)
 {
 #if USE_SYSCTL
-    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+    int mib[4] = { CTL_KERN } ;
     struct kinfo_proc *job;
     size_t jsize;
     int njobs;
     Proc *tj;
     int i, rc = 0;
 
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_ALL;
+    mib[3] = 0;
     if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
 	return 0;
 
@@ -153,24 +178,24 @@ getprocesses(int flags)
 		size_t argsize;
 		char *p;
 		
-		CREATE(tj->cmdline);
-
 		mib[1] = KERN_PROCARGS2;
 		mib[2] = tj->pid;
 
 		argsize = sizeof args;
+		p = args.rest;
 		if ( sysctl(mib,3,&args,&argsize,NULL,0) == 0 ) {
+		    char *end = argsize + (char*)&args;
 
-		    p = args.rest;
-		    while ( !*p ) ++p;
-		    while ( *p ) ++p;
-		    while ( !*p) ++p;
+		    p = skipz(p, end);
+		    p = skip (p, end);/* executable name */
+		    p = skip (p, end);/* argv[0] */
+
+		    if ( !p ) goto overflow;
 		    
-		    p += strlen(p)+1;	/* skip argv[0] */
-
+		    CREATE(tj->cmdline);
 		    while (args.count-- > 1) {
 			do {
-			    if ( p >= args.rest + sizeof args.rest )
+			    if ( p >= end )
 				goto overflow;
 			    EXPAND(tj->cmdline) = *p;
 			} while (*p++);
@@ -212,9 +237,9 @@ getprocesses(int flags)
 		if ( (av = kvm_getargv(k,&job[i],0)) && *av ) {
 		    CREATE(tj->cmdline);
 		    for ( ++av; *av; ++av) {
-			for ( ; **av; ++(*av) )
+			do {
 			    EXPAND(tj->cmdline) = **av;
-			EXPAND(tj->cmdline) = 0;
+			} while ( *(*av)++ );
 		    }
 		}
 	    }
