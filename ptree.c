@@ -101,6 +101,7 @@ ingest(struct dirent *de, int flags)
 		CREATE(t->cmdline);
 		while ( (c = getc(f)) != EOF )
 		    EXPAND(t->cmdline) = c;
+		EXPAND(t->cmdline) = 0;
 		fclose(f);
 	    }
 	}

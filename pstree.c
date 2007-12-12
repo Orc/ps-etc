@@ -410,7 +410,7 @@ print(int first, int count, Proc *node)
 	    if ( first ) {
 		if ( !showargs )
 		    putcard(node->sib ? '+' : '-' );
-		branch = node->sib ? '|' : ' ';
+		branch = node->sib ? '|' : (showargs ? '`' : ' ');
 		push(peek() + (showargs ? 2 : indent), branch);
 	    }
 	    if ( branch != ' ' && !node->sib) active('`');
