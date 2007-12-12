@@ -337,14 +337,13 @@ shuffle()
 Proc *
 ptree(int flags)
 {
+    int i;
+
     S(unsort) = 0;
 
     if ( getprocesses(flags) == 0 )
 	return 0;
-
     qsort(T(unsort), S(unsort), sizeof T(unsort)[0], compar);
-
     shuffle();
-
     return pfind(1);
 }

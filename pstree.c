@@ -41,6 +41,20 @@ int showuser = 0;	/* -u:  show username transitions */
 
 Proc * sibsort(Proc *);
 
+/* set the udata field in the Proc*
+ */
+static void
+udata(Proc *t)
+{
+    char *p = t->process;
+
+    if ( showargs && S(t->cmdline) && T(t->cmdline)[0] )
+	p = T(t->cmdline);
+
+    t->udata = (void*) (showargpath ? p : basename(p));
+}
+
+
 /* compare two ->child trees
  */
 cmpchild(Proc *a, Proc *b)
@@ -82,22 +96,17 @@ int
 cmp(Proc *a, Proc *b)
 {
     int rc;
-    char *aproc, *bproc;
 
-    if ( showargs && S(a->cmdline) && T(a->cmdline)[0] )
-	aproc = T(a->cmdline);
-    else
-	aproc = a->process;
+    if ( !a->udata )
+	udata(a);
 
-    if ( showargs && S(b->cmdline) && T(b->cmdline)[0] )
-	bproc = T(b->cmdline);
-    else
-	bproc = b->process;
+    if ( !b->udata )
+	udata(b);
 
-    rc = strcasecmp(aproc, bproc);
+    rc = strcasecmp((char*)a->udata, (char*)b->udata);
 
     if ( rc == 0 )
-	rc = strcmp(aproc, bproc);
+	rc = strcmp((char*)a->udata, (char*)b->udata);
 
     if ( rc == 0 )
 	rc = cmpchild(a, b);
@@ -320,7 +329,6 @@ int
 printjob(int first, int count, Proc *p)
 {
     int tind = 0;
-    char *pa, *qa;
 
     if ( showargs || !first ) dle();
 
@@ -329,15 +337,9 @@ printjob(int first, int count, Proc *p)
     else if ( tsp )
 	tind = putcard('-');
 
-    if ( showargs && S(p->cmdline) && T(p->cmdline)[0] )
-	pa = T(p->cmdline);
-    else
-	pa = p->process;
-    
-    if ( !showargpath &&  (qa = strrchr(pa, '/')) )
-	pa = 1+qa;
-    
-    tind += prints(pa, strlen(pa));
+    if ( !p->udata )
+	udata(p);
+    tind += prints((char*)p->udata, strlen((char*)p->udata));
 
     if ( showpid )
 	tind += po() + printcard("%d", p->pid);

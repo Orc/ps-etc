@@ -17,6 +17,7 @@ typedef struct ptree_proc {
     char process[80];
     Cstring cmdline;
     char status;
+    void *udata;
 } Proc;
 
 Proc *ptree(int);
