@@ -297,7 +297,7 @@ printjob(int first, int count, Proc *p)
     else if ( tsp )
 	tind = putcard('-');
 
-    if ( showargs && S(p->cmdline) )
+    if ( showargs && S(p->cmdline) && T(p->cmdline)[0] )
 	pa = T(p->cmdline);
     else
 	pa = p->process;
