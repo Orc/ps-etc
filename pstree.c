@@ -47,11 +47,12 @@ static void
 udata(Proc *t)
 {
     char *p = t->process;
+    char *q;
 
     if ( showargs && S(t->cmdline) && T(t->cmdline)[0] )
 	p = T(t->cmdline);
 
-    t->udata = (void*) (showargpath ? p : basename(p));
+    t->udata = (void*) (showargpath || !(q = strrchr(p, '/')) ? p : 1+q);
 }
 
 
