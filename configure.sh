@@ -5,9 +5,6 @@
 # is a script that's processed with eval, so you need to be very careful to
 # make certain that what you quote is what you want to quote.
 
-ac_help='
---use-kvm		use kvm_getprocs() if at all possible'
-
 # load in the configuration file
 #
 TARGET=psetc
@@ -44,10 +41,13 @@ AC_CHECK_HEADERS sgtty.h
 [ "$OS_FREEBSD" -o "$OS_DRAGONFLY" ] || AC_CHECK_HEADERS malloc.h
 
 # check to see if we're on a platform that supports getting proc
-# info via sysctl().    kvm_getprocs() access needs to be explicitly
-# requested because you have to be root to read the kernel image,
-# while /proc and sysctl() can be read by anyone.
+# info via sysctl(), kvm_getprocs(), or the /proc filesystem.
+# kvm_getprocs() needs to be done by root to get around protections
+# on kmem, sysctl() needs to be done by root if you want to be
+# able to get the argument lists of processes not owned by you,
+# and /proc lets anyone grub through process commandlines.
 
+# kvm_getprocs exists?
 icanhaskvm() {
     if AC_QUIET AC_CHECK_HEADERS kvm.h sys/param.h sys/sysctl.h; then
 	if LIBS=-lkvm AC_QUIET AC_CHECK_FUNCS kvm_getprocs; then
@@ -56,34 +56,33 @@ icanhaskvm() {
 	    AC_SUB 'MKSUID' 'chmod +s'
 	    _proc=kvm
 	    AC_LIBS="$AC_LIBS -lkvm"
-	    return
+	    return 0
 	fi
     fi
+    return 1
 }
 
-LOGN "get process information from"
-unset _proc
-
-test "$USE_KVM" && icanhaskvm
-
-if [ -z "$_proc" ]; then
+# darwinish (also FreeBSD 6, other recent *BSDs?) sysctl()
+icanhassysctl() {
     if AC_QUIET AC_CHECK_HEADERS sys/sysctl.h; then
 	if AC_QUIET AC_CHECK_FUNCS sysctl; then
 	    if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h;then
+		LOG " sysctl()"
 		AC_DEFINE USE_SYSCTL
-		_proc=sysctl
+		AC_SUB 'MKSUID' 'chmod +s'
+		return 0
 	    fi
 	fi
-    fi > /dev/null
+    fi
+    return 1
+}
 
-    test "$_proc" = "sysctl" && LOG " sysctl()"
-fi
-
-test "$_proc" || icanhaskvm
-
-if test -z "$_proc"; then
+# traditional old,slow,but human readable /proc
+# (only defined for freebsd and linux, sorry)
+icanhasproc() {
     LOGN " /proc"
     AC_DEFINE USE_PROC
+    AC_SUB 'MKSUID' ':'
 
     if [ "$OS_LINUX" ]; then
 	AC_DEFINE STATFILE \"stat\"
@@ -91,20 +90,23 @@ if test -z "$_proc"; then
 	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' \
 		  'fscanf(f, "%d (%200s %c %d", p, n, s, pp)'
 	LOG " (linux -> /proc/*/stat)"
+	return 1
     elif [ "$OS_FREEBSD" ]; then
 	AC_DEFINE STATFILE \"status\"
 	AC_DEFINE STATSCANFOK 3
 	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' 'fscanf(f, "%s %d %d", n, p, pp)'
 	LOG " (freebsd -> /proc/*/status)"
+	return 1
     else
 	LOG " (not defined)"
 	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
-fi
+    return 0
+}
 
-if [ "_proc" != "kvm" ]; then
-    AC_SUB 'MKSUID' ':'
-fi
+LOGN "get process information from"
+
+icanhassysctl || icanhaskvm || icanhasproc
 
 AC_DEFINE CONFDIR '"'$AC_CONFDIR'"'
 
