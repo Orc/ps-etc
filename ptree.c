@@ -98,10 +98,12 @@ ingest(struct dirent *de, int flags)
 	    t->status = status;
 
 	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
-		CREATE(t->cmdline);
-		while ( (c = getc(f)) != EOF )
-		    EXPAND(t->cmdline) = c;
-		EXPAND(t->cmdline) = 0;
+		while ( (c = getc(f)) != EOF ) {
+		    if ( T(t->cmdline) )
+			EXPAND(t->cmdline) = c;
+		    else if ( c == 0 )
+			CREATE(t->cmdline);
+		}
 		fclose(f);
 	    }
 	}
@@ -112,42 +114,17 @@ ingest(struct dirent *de, int flags)
 }
 #endif
 
-
-#if USE_SYSCTL
-static char *
-skipz(char *p, char *end)
-{
-    if ( p )
-	while ( (p < end) && !*p )
-	    ++p;
-    return p;
-}
-
-static char *
-skip(char *p, char *end)
-{
-    if ( p )
-	while ( (p < end) && *p )
-	    ++p;
-    return skipz(p,end);
-}
-#endif
-
-
 static int
 getprocesses(int flags)
 {
 #if USE_SYSCTL
-    int mib[4] = { CTL_KERN } ;
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
     struct kinfo_proc *job;
     size_t jsize;
     int njobs;
     Proc *tj;
     int i, rc = 0;
 
-    mib[1] = KERN_PROC;
-    mib[2] = KERN_PROC_ALL;
-    mib[3] = 0;
     if ( sysctl(mib, 4, NULL, &jsize, NULL, 0) != 0 )
 	return 0;
 
@@ -176,26 +153,27 @@ getprocesses(int flags)
 		size_t argsize;
 		char *p;
 		
+		CREATE(tj->cmdline);
+
 		mib[1] = KERN_PROCARGS2;
 		mib[2] = tj->pid;
 
 		argsize = sizeof args;
-		p = args.rest;
 		if ( sysctl(mib,3,&args,&argsize,NULL,0) == 0 ) {
-		    char *end = argsize + (char*)&args;
 
-		    p = skipz(p, end);
-		    p = skip (p, end);/* executable name */
+		    p = args.rest;
+		    while ( !*p ) ++p;
+		    while ( *p ) ++p;
+		    while ( !*p) ++p;
+		    
+		    p += strlen(p)+1;	/* skip argv[0] */
 
-		    if ( p ) {
-			CREATE(tj->cmdline);
-			while (args.count-- > 0) {
-			    do {
-				if ( p >= end )
-				    goto overflow;
-				EXPAND(tj->cmdline) = *p;
-			    } while (*p++);
-			}
+		    while (args.count-- > 1) {
+			do {
+			    if ( p >= args.rest + sizeof args.rest )
+				goto overflow;
+			    EXPAND(tj->cmdline) = *p;
+			} while (*p++);
 		    }
 	    overflow: ;
 		}
@@ -222,21 +200,34 @@ getprocesses(int flags)
     }
 
     for (i=0; i < njobs; i++)
-	if ( tj = another(job[i].kp_proc.p_comm) ) {
-	    tj->pid = job[i].kp_proc.p_pid;
-	    tj->ppid = job[i].kp_eproc.e_ppid;
-	    tj->uid = job[i].kp_eproc.e_pcred.p_ruid;
-	    tj->gid = job[i].kp_eproc.e_pcred.p_rgid;
+#if FREEBSD_7_KVM
+# define kpid  ki_pid
+# define kppid ki_ppid
+# define kuid  ki_ruid
+# define kgid  ki_rgid
+# define kname ki_comm
+#else
+# define kpid  kp_proc.p_pid
+# define kppid kp_eproc.e_ppid
+# define kuid  kp_eproc.e_pred.p_ruid
+# define kgid  kp_eproc.e_pcred.p_rgid
+# define kname kp_proc.p_comm
+#endif
+	if ( tj = another(job[i].kname) ) {
+	    tj->pid = job[i].kpid;
+	    tj->ppid =job[i].kppid;
+	    tj->uid = job[i].kuid;
+	    tj->gid = job[i].kgid;
 
 	    if ( flags & PTREE_ARGS ) {
 		char **av;
 
 		if ( (av = kvm_getargv(k,&job[i],0)) && *av ) {
 		    CREATE(tj->cmdline);
-		    for ( ; *av; ++av) {
-			do {
+		    for ( ++av; *av; ++av) {
+			for ( ; **av; ++(*av) )
 			    EXPAND(tj->cmdline) = **av;
-			} while ( *(*av)++ );
+			EXPAND(tj->cmdline) = 0;
 		    }
 		}
 	    }
@@ -337,13 +328,14 @@ shuffle()
 Proc *
 ptree(int flags)
 {
-    int i;
-
     S(unsort) = 0;
 
     if ( getprocesses(flags) == 0 )
 	return 0;
+
     qsort(T(unsort), S(unsort), sizeof T(unsort)[0], compar);
+
     shuffle();
+
     return pfind(1);
 }
