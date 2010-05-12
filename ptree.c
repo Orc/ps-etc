@@ -209,7 +209,7 @@ getprocesses(int flags)
 #else
 # define kpid  kp_proc.p_pid
 # define kppid kp_eproc.e_ppid
-# define kuid  kp_eproc.e_pred.p_ruid
+# define kuid  kp_eproc.e_pcred.p_ruid
 # define kgid  kp_eproc.e_pcred.p_rgid
 # define kname kp_proc.p_comm
 #endif
