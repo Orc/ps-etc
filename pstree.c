@@ -394,7 +394,7 @@ print(int first, int count, Proc *node)
     first = 1;
 
     do {
-	if ( compress && sameas(node, node->sib, 0) )
+	if ( (compress && sameas(node, node->sib, 0)) || (node->sib && node->pid == node->sib->pid) )
 	    count++;
 	else {
 	    if ( first ) {
