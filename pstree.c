@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/types.h>
-#include <string.h>
+
 #include <unistd.h>
 #if HAVE_LIBGEN_H
 # include <libgen.h>
@@ -32,7 +32,6 @@ extern void ejectcard();
 extern void cardwidth();
 
 int showargs = 0;	/* -a:  show the entire command line */
-int showargpath = 0;	/* -A:  but show full pathname of argv[0] */
 int compress = 1;	/* !-c: compact duplicate subtrees */
 int clipping = 1;	/* !-l: clip output to screenwidth */
 int sortme   = 1;	/* !-n: sort output */
@@ -40,21 +39,6 @@ int showpid  = 0;	/* -p:  show process ids */
 int showuser = 0;	/* -u:  show username transitions */
 
 Proc * sibsort(Proc *);
-
-/* set the udata field in the Proc*
- */
-static void
-udata(Proc *t)
-{
-    char *p = t->process;
-    char *q;
-
-    if ( showargs && S(t->cmdline) && T(t->cmdline)[0] )
-	p = T(t->cmdline);
-
-    t->udata = (void*) (showargpath || !(q = strrchr(p, '/')) ? p : 1+q);
-}
-
 
 /* compare two ->child trees
  */
@@ -96,18 +80,10 @@ cmpchild(Proc *a, Proc *b)
 int
 cmp(Proc *a, Proc *b)
 {
-    int rc;
-
-    if ( !a->udata )
-	udata(a);
-
-    if ( !b->udata )
-	udata(b);
-
-    rc = strcasecmp((char*)a->udata, (char*)b->udata);
+    int rc = strcasecmp(a->process, b->process);
 
     if ( rc == 0 )
-	rc = strcmp((char*)a->udata, (char*)b->udata);
+	rc = strcmp(a->process, b->process);
 
     if ( rc == 0 )
 	rc = cmpchild(a, b);
@@ -303,25 +279,6 @@ dle()
 }
 
 
-/* print a string, expanding unusual characters to \ooo escapes
- */
-int
-prints(unsigned char *s, int len)
-{
-    int siz, c;
-
-    for (siz=0; len > 0; --len, ++s) {
-	if ( !(c = *s) )
-	    siz += putcard(' ');
-	else if ( isprint(c) && (c > ' ') )
-	    siz += putcard(*s);
-	else
-	    siz += printcard("\\%03o", c);
-    }
-    return siz;
-}
-
-
 /* print process information (process name, id, uid translation)
  * and branch prefixes and suffixes.   Returns the # of characters
  * printed, so print() can adjust the indent for subtrees
@@ -338,9 +295,7 @@ printjob(int first, int count, Proc *p)
     else if ( tsp )
 	tind = putcard('-');
 
-    if ( !p->udata )
-	udata(p);
-    tind += prints((char*)p->udata, strlen((char*)p->udata));
+    tind += printcard("%s", p->process);
 
     if ( showpid )
 	tind += po() + printcard("%d", p->pid);
@@ -358,13 +313,20 @@ printjob(int first, int count, Proc *p)
     tind += pc();
 
     if ( showargs ) {
-	if ( S(p->cmdline) ) {
-	    int i;
+	if ( T(p->cmdline) ) {
+	    unsigned int i, c;
 
-	    for ( i=0; T(p->cmdline)[i]; ++i)
-		;
+	    putcard(' ');
+	    for (i=0; i < S(p->cmdline); i++) {
+		c = T(p->cmdline)[i];
 
-	    prints(T(p->cmdline) + i, S(p->cmdline) - i);
+		if ( c == 0 )
+		    putcard(' ');
+		else if ( c <= ' ' || !isprint(c) )
+		    printcard("\\\%03o", c);
+		else
+		    putcard(c);
+	    }
 	}
 	eol();
     }
@@ -432,13 +394,13 @@ print(int first, int count, Proc *node)
     first = 1;
 
     do {
-	if ( compress && sameas(node, node->sib, 0) )
+	if ( (compress && sameas(node, node->sib, 0)) || (node->sib && node->pid == node->sib->pid) )
 	    count++;
 	else {
 	    if ( first ) {
 		if ( !showargs )
 		    putcard(node->sib ? '+' : '-' );
-		branch = node->sib ? '|' : (showargs ? '`' : ' ');
+		branch = node->sib ? '|' : ' ';
 		push(peek() + (showargs ? 2 : indent), branch);
 	    }
 	    if ( branch != ' ' && !node->sib) active('`');
@@ -475,9 +437,8 @@ main(int argc, char **argv)
     argv[0] = basename(argv[0]);
 
     opterr = 1;
-    while ( (opt = getopt(argc, argv, "aAclnpuV")) != EOF )
+    while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
 	switch (opt) {
-	case 'A':   showargpath = 1; break;
 	case 'a':   showargs = 1; compress = 0; break;
 	case 'c':   compress = 0; break;
 	case 'l':   clipping = 0; break;
