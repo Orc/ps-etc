@@ -100,12 +100,12 @@ ingest(struct dirent *de, int flags)
 	    t->status = status;
 
 	    if ( (flags & PTREE_ARGS) && (f = fopen("cmdline", "r")) ) {
+		CREATE(t->cmdline);
 		while ( (c = getc(f)) != EOF ) {
-		    if ( T(t->cmdline) )
+		    if ( c || S(t->cmdline) )
 			EXPAND(t->cmdline) = c;
-		    else if ( c == 0 )
-			CREATE(t->cmdline);
 		}
+		t->renamed = strcmp(basename(T(t->cmdline)), name);
 		fclose(f);
 	    }
 	}
@@ -169,15 +169,15 @@ getprocesses(int flags)
 		    while ( *p ) ++p;
 		    while ( !*p) ++p;
 		    
-		    p += strlen(p)+1;	/* skip argv[0] */
-
-		    while (args.count-- > 1) {
+		    while (args.count-- > 0) {
 			do {
 			    if ( p >= args.rest + sizeof args.rest )
 				goto overflow;
-			    EXPAND(tj->cmdline) = *p;
+			    if ( *p || S(tj->cmdline) )
+				EXPAND(tj->cmdline) = *p;
 			} while (*p++);
 		    }
+		    tj->renamed = strcmp(basename(T(tj->cmdline)), tj->process);
 	    overflow: ;
 		}
 	    }
@@ -230,17 +230,10 @@ getprocesses(int flags)
 		    for ( j=0; av[j]; ++j ) {
 			if ( S(tj->cmdline) ) EXPAND(tj->cmdline) = 0;
 			p = av[j];
-			if ( j == 0 ) {
-			    q = basename(p);
-			    tj->renamed = strcmp(q, job[i].kname);
-
-			    if ( tj->renamed || strcmp(q, p) )
-				p = q;
-			}
-
 			while ( *p )
 			    EXPAND(tj->cmdline) = *p++;
 		    }
+		    tj->renamed = strcmp(basename(T(tj->cmdline)), tj->process);
 		}
 	    }
 	}

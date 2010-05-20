@@ -153,7 +153,7 @@ sibsort(Proc *p)
  */
 static int _paren = 0;
 
-/* when first called, po() prints '(', then every other time
+/* when first called, po() prints ' (', then every other time
  * it's called it prints ',' until pc() is called to close
  * the parentheses.
  */
