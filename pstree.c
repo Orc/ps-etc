@@ -37,6 +37,7 @@ int clipping = 1;	/* !-l: clip output to screenwidth */
 int sortme   = 1;	/* !-n: sort output */
 int showpid  = 0;	/* -p:  show process ids */
 int showuser = 0;	/* -u:  show username transitions */
+int exposeargs = 0;	/* -s:  expand spaces inside arguments to \040 */
 
 Proc * sibsort(Proc *);
 
@@ -299,7 +300,6 @@ printjob(int first, int count, Proc *p)
 	if ( T(p->cmdline) ) {
 	    unsigned int step=0, i, c, first=1;
 
-	    /*putcard(' ');*/
 	    for (i=0; i < S(p->cmdline); i++) {
 		c = T(p->cmdline)[i];
 
@@ -307,7 +307,9 @@ printjob(int first, int count, Proc *p)
 		    if ( first ) first = 0;
 		    putcard(' ');
 		}
-		else if ( c <= ' ' || !isprint(c) )
+		else if ( c == ' ' && exposeargs )
+		    step += printcard("\\\%03o", c);
+		else if ( c < ' ' || !isprint(c) )
 		    step += printcard("\\\%03o", c);
 		else
 		    step += putcard(c);
@@ -456,13 +458,14 @@ main(int argc, char **argv)
     argv[0] = basename(argv[0]);
 
     opterr = 1;
-    while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
+    while ( (opt = getopt(argc, argv, "aclnpsuV")) != EOF )
 	switch (opt) {
 	case 'a':   showargs = 1; break;
 	case 'c':   compress = 0; break;
 	case 'l':   clipping = 0; break;
 	case 'n':   sortme = compress = 0; break;
 	case 'p':   showpid  = 1; break;
+	case 's':   exposeargs = 1; break;
 	case 'u':   showuser = 1; break;
 	case 'V':   printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
 	default :   exit(1);

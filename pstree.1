@@ -8,7 +8,7 @@
 .Nd display a process heirarchy
 .Sh SYNOPSIS
 .Nm
-.Op Fl aclnpu
+.Op Fl aclnpsu
 .Op Ar pid No | Ar user
 .Sh DESCRIPTION
 The
@@ -37,6 +37,8 @@ Don't truncate long lines.
 Don't sort the process list.
 .It Fl p
 Show process ids.
+.It Fl s
+Print spaces inside arguments as if they were nonprinting characters.
 .It Fl u
 Show the process owner of each subtree.
 .El
