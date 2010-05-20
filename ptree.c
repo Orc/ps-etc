@@ -25,6 +25,8 @@
 # include <sys/sysctl.h>
 #endif
 
+#include <libgen.h>
+
 #include "ptree.h"
 
 static STRING(Proc) unsort = { 0 };
@@ -114,6 +116,7 @@ ingest(struct dirent *de, int flags)
 }
 #endif
 
+
 static int
 getprocesses(int flags)
 {
@@ -189,7 +192,8 @@ getprocesses(int flags)
     struct kinfo_proc *job;
     kvm_t *k;
     Proc *tj;
-    int i, njobs;
+    int j, i, njobs;
+    char **av, *p, *q;
 
     if ( !(k = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, NULL)) )
 	return 0;
@@ -220,14 +224,22 @@ getprocesses(int flags)
 	    tj->gid = job[i].kgid;
 
 	    if ( flags & PTREE_ARGS ) {
-		char **av;
 
 		if ( (av = kvm_getargv(k,&job[i],0)) && *av ) {
 		    CREATE(tj->cmdline);
-		    for ( ++av; *av; ++av) {
-			for ( ; **av; ++(*av) )
-			    EXPAND(tj->cmdline) = **av;
-			EXPAND(tj->cmdline) = 0;
+		    for ( j=0; av[j]; ++j ) {
+			if ( S(tj->cmdline) ) EXPAND(tj->cmdline) = 0;
+			p = av[j];
+			if ( j == 0 ) {
+			    q = basename(p);
+			    tj->renamed = strcmp(q, job[i].kname);
+
+			    if ( tj->renamed || strcmp(q, p) )
+				p = q;
+			}
+
+			while ( *p )
+			    EXPAND(tj->cmdline) = *p++;
 		    }
 		}
 	    }

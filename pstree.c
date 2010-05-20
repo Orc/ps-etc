@@ -163,7 +163,7 @@ po()
     if (_paren)
 	return putcard(',');
     _paren = 1;
-    return putcard('(');
+    return putcard(' ') + putcard('(');
 }
 
 
@@ -295,7 +295,30 @@ printjob(int first, int count, Proc *p)
     else if ( tsp )
 	tind = putcard('-');
 
-    tind += printcard("%s", p->process);
+    if ( showargs ) {
+	if ( T(p->cmdline) ) {
+	    unsigned int step=0, i, c, first=1;
+
+	    /*putcard(' ');*/
+	    for (i=0; i < S(p->cmdline); i++) {
+		c = T(p->cmdline)[i];
+
+		if ( c == 0 ) {
+		    if ( first ) first = 0;
+		    putcard(' ');
+		}
+		else if ( c <= ' ' || !isprint(c) )
+		    step += printcard("\\\%03o", c);
+		else
+		    step += putcard(c);
+	    }
+	    tind += step;
+	}
+	if ( p->renamed )
+	    po() + printcard("%s", p->process) + pc();
+    }
+    else
+	tind += printcard("%s", p->process);
 
     if ( showpid )
 	tind += po() + printcard("%d", p->pid);
@@ -312,24 +335,8 @@ printjob(int first, int count, Proc *p)
 
     tind += pc();
 
-    if ( showargs ) {
-	if ( T(p->cmdline) ) {
-	    unsigned int i, c;
-
-	    putcard(' ');
-	    for (i=0; i < S(p->cmdline); i++) {
-		c = T(p->cmdline)[i];
-
-		if ( c == 0 )
-		    putcard(' ');
-		else if ( c <= ' ' || !isprint(c) )
-		    printcard("\\\%03o", c);
-		else
-		    putcard(c);
-	    }
-	}
+    if ( showargs )
 	eol();
-    }
     else if ( p->child ) {
 	putcard('-');
 	tind++;
@@ -350,20 +357,32 @@ sameas(Proc *a, Proc *b, int walk)
     if ( ! (a && b) )
 	return (a == b);
 
+    if ( a->pid == b->pid )
+	return 1;
+
     if ( strcmp(a->process, b->process) != 0 )
 	return 0;
+
+    if ( showargs ) {
+	if ( a->renamed != b->renamed )
+	    return 0;
+
+	if ( S(a->cmdline) != S(b->cmdline) )
+	    return 0;
+	if ( memcmp(T(a->cmdline), T(b->cmdline), S(a->cmdline)) )
+	    return 0;
+    }
 
     if ( !sameas(a->child, b->child, 1) )
 	return 0;
 
-    if ( !walk ) return 1;
-
-    do {
+    if ( walk ) do {
 	if ( !sameas(a->sib, b->sib, 0) )
 	    return 0;
 	a = a->sib;
 	b = b->sib;
     } while ( a && b );
+
     return 1;
 }
 
@@ -394,7 +413,7 @@ print(int first, int count, Proc *node)
     first = 1;
 
     do {
-	if ( (compress && sameas(node, node->sib, 0)) || (node->sib && node->pid == node->sib->pid) )
+	if ( compress && sameas(node, node->sib, 0) )
 	    count++;
 	else {
 	    if ( first ) {
@@ -439,11 +458,11 @@ main(int argc, char **argv)
     opterr = 1;
     while ( (opt = getopt(argc, argv, "aclnpuV")) != EOF )
 	switch (opt) {
-	case 'a':   showargs = 1; compress = 0; break;
+	case 'a':   showargs = 1; break;
 	case 'c':   compress = 0; break;
 	case 'l':   clipping = 0; break;
 	case 'n':   sortme = compress = 0; break;
-	case 'p':   showpid  = 1; compress = 0; break;
+	case 'p':   showpid  = 1; break;
 	case 'u':   showuser = 1; break;
 	case 'V':   printf("%s (ps-etc) %s\n", argv[0], version); exit(0);
 	default :   exit(1);

@@ -11,6 +11,7 @@ typedef struct ptree_proc {
     struct ptree_proc *sib;
     int children;
     int sorted;
+    int renamed;
     pid_t pid, ppid;
     uid_t uid, gid;
     time_t ctime;
