@@ -280,6 +280,30 @@ dle()
 }
 
 
+int
+printchar(char c)
+{
+    if ( c == 0 )
+	return putcard(' ');
+    else if ( c == ' ' && exposeargs )
+	return printcard("\\\%03o", c);
+    else if ( c < ' ' || !isprint(c) )
+	return printcard("\\\%03o", c);
+    else
+	return putcard(c);
+}
+
+
+int
+printargv0(char *p)
+{
+    int ret = 0;
+
+    while ( *p )
+	ret += printchar(*p++);
+}
+
+
 /* print process information (process name, id, uid translation)
  * and branch prefixes and suffixes.   Returns the # of characters
  * printed, so print() can adjust the indent for subtrees
@@ -298,23 +322,15 @@ printjob(int first, int count, Proc *p)
 
     if ( showargs ) {
 	if ( T(p->cmdline) ) {
-	    unsigned int step=0, i, c, first=1;
+	    unsigned int i;
 
-	    for (i=0; i < S(p->cmdline); i++) {
-		c = T(p->cmdline)[i];
-
-		if ( c == 0 ) {
-		    if ( first ) first = 0;
-		    putcard(' ');
-		}
-		else if ( c == ' ' && exposeargs )
-		    step += printcard("\\\%03o", c);
-		else if ( c < ' ' || !isprint(c) )
-		    step += printcard("\\\%03o", c);
-		else
-		    step += putcard(c);
-	    }
-	    tind += step;
+	    tind += printargv0( (clipping && !p->renamed) ? basename(T(p->cmdline)) : T(p->cmdline) );
+		
+	    for (i=0; i < S(p->cmdline) && T(p->cmdline)[i]; i++)
+		;
+	    
+	    for (; i < S(p->cmdline); i++)
+		printchar(T(p->cmdline)[i]);
 	}
 	if ( p->renamed )
 	    po() + printcard("%s", p->process) + pc();

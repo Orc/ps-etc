@@ -165,9 +165,12 @@ getprocesses(int flags)
 		if ( sysctl(mib,3,&args,&argsize,NULL,0) == 0 ) {
 
 		    p = args.rest;
-		    while ( !*p ) ++p;
-		    while ( *p ) ++p;
-		    while ( !*p) ++p;
+
+		    if ( args.count > 0 ) {
+			while ( !*p ) ++p;
+			while ( *p ) ++p;
+			while ( !*p) ++p;
+		    }
 		    
 		    while (args.count-- > 0) {
 			do {
@@ -177,7 +180,7 @@ getprocesses(int flags)
 				EXPAND(tj->cmdline) = *p;
 			} while (*p++);
 		    }
-		    tj->renamed = strcmp(basename(T(tj->cmdline)), tj->process);
+		    tj->renamed = strncmp(basename(T(tj->cmdline)), tj->process, strlen(tj->process));
 	    overflow: ;
 		}
 	    }
