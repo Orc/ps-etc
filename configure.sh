@@ -76,6 +76,7 @@ if [ -z "$_proc" ]; then
 	if AC_QUIET AC_CHECK_FUNCS sysctl; then
 	    if AC_QUIET AC_CHECK_STRUCT kinfo_proc sys/types.h sys/sysctl.h;then
 		AC_DEFINE USE_SYSCTL
+		AC_SUB 'MKSUID' 'chmod +s'
 		_proc=sysctl
 	    fi
 	fi
@@ -105,9 +106,6 @@ if test -z "$_proc"; then
 	LOG " (not defined)"
 	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
     fi
-fi
-
-if [ "_proc" != "kvm" ]; then
     AC_SUB 'MKSUID' ':'
 fi
 
