@@ -378,6 +378,9 @@ sameas(Proc *a, Proc *b, int walk)
     if ( a->pid == b->pid )
 	return 1;
 
+    if ( showpid && (a->pid != b->pid) )
+	return 0;
+
     if ( strcmp(a->process, b->process) != 0 )
 	return 0;
 
