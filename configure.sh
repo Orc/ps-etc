@@ -16,6 +16,7 @@ TARGET=psetc
 AC_INIT $TARGET
 
 AC_PROG_CC
+unset _MK_LIBRARIAN
 
 case "$AC_CC $AC_CFLAGS" in
 *-Wall*)    AC_DEFINE 'while(x)' 'while( (x) != 0 )'
@@ -50,7 +51,7 @@ AC_CHECK_HEADERS sgtty.h
 
 icanhaskvm() {
     if AC_QUIET AC_CHECK_HEADERS kvm.h sys/param.h sys/sysctl.h; then
-	if LIBS=-lkvm AC_QUIET AC_CHECK_FUNCS kvm_getprocs; then
+	if AC_QUIET AC_LIBRARY kvm_getprocs -lkvm; then
 	    if AC_QUIET AC_CHECK_FIELD kinfo_proc ki_pid kvm.h sys/param.h sys/sysctl.h sys/user.h; then
 		AC_DEFINE FREEBSD_7_KVM
 		LOG " kvm_getprocs() [FreeBSD 7]"
@@ -60,7 +61,6 @@ icanhaskvm() {
 	    AC_DEFINE USE_KVM
 	    AC_SUB 'MKSUID' 'chmod +s'
 	    _proc=kvm
-	    AC_LIBS="$AC_LIBS -lkvm"
 	    return
 	fi
     fi
@@ -104,7 +104,7 @@ if test -z "$_proc"; then
 	LOG " (freebsd -> /proc/*/status)"
     else
 	LOG " (not defined)"
-	AC_FAIL "Sorry, but /proc access is only defined on Linux and FreeBSD"
+	AC_FAIL "Sorry, but /proc access is only supported on Linux and FreeBSD"
     fi
     AC_SUB 'MKSUID' ':'
 fi
