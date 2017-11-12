@@ -75,6 +75,10 @@ ingest(struct dirent *de, int flags)
 	if (!isdigit(*p))
 	    return 0;
 
+#ifdef OS_MINIX
+    pid = atoi(de->d_name);
+#endif
+
     if (chdir(de->d_name) == 0) {
 	if ( (stat(".", &st) != 0) || !(f = fopen(STATFILE, "r")) ) {
 	    chdir("..");
@@ -252,13 +256,21 @@ getprocesses(int flags)
     
     int home = open(".", O_RDONLY);
 
-    if ( (home == -1) || (chdir("/proc") == -1) ) return 0;
+    if (home == -1) return 0; /* can't cache current directory? die */
+
+    if ( chdir("/proc") != 0 ) {
+	/* can't cd into /proc */
+	fchdir(home);
+	close(home);
+	return 0;
+    }
 
     S(unsort) = 0;
     if ( d = opendir(".") ) {
 	while (de = readdir(d))
 	    if ( ingest(de, flags) == -1 ) {
 		fchdir(home);
+		close(home);
 		return 0;
 	    }
 	closedir(d);
