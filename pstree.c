@@ -321,7 +321,7 @@ printjob(int first, int count, Proc *p)
 	tind = putcard('-');
 
     if ( showargs ) {
-	if ( T(p->cmdline) ) {
+	if ( S(p->cmdline) && T(p->cmdline) ) {
 	    unsigned int i;
 
 	    tind += printargv0( (clipping && !p->renamed) ? basename(T(p->cmdline)) : T(p->cmdline) );
