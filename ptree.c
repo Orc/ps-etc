@@ -109,7 +109,7 @@ ingest(struct dirent *de, int flags)
 		    if ( c || S(t->cmdline) )
 			EXPAND(t->cmdline) = c;
 		}
-		t->renamed = strcmp(basename(T(t->cmdline)), name);
+		t->renamed = S(t->cmdline) && strcmp(basename(T(t->cmdline)), name);
 		fclose(f);
 	    }
 	}
