@@ -332,6 +332,9 @@ printjob(int first, int count, Proc *p)
 	    for (; i < S(p->cmdline); i++)
 		printchar(T(p->cmdline)[i]);
 	}
+	else if ( !p->renamed )
+	    printcard("%s", p->process);
+	    
 	if ( p->renamed )
 	    po() + printcard("%s", p->process) + pc();
     }
