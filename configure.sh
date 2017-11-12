@@ -102,9 +102,14 @@ if test -z "$_proc"; then
 	AC_DEFINE STATSCANFOK 3
 	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' 'fscanf(f, "%s %d %d", n, p, pp)'
 	LOG " (freebsd -> /proc/*/status)"
+    elif [ "$OS_MINIX" ]; then
+	AC_DEFINE STATFILE \"psinfo\"
+	AC_DEFINE STATSCANFOK 3
+	AC_DEFINE 'STATSCANF(f,p,pp,n,s)' 'fscanf(f, "%*d %*c %*ld %s %c %*d %*ld %*ld %*d %*ld %*ld %*ld %*ld %*ld %*c %d", n, s, pp)'
+	LOG " (minix -> /proc/*/psinfo)"
     else
 	LOG " (not defined)"
-	AC_FAIL "Sorry, but /proc access is only supported on Linux and FreeBSD"
+	AC_FAIL "Sorry, but /proc access is only supported on Linux, FreeBSD, and Minux 3.3"
     fi
     AC_SUB 'MKSUID' ':'
 fi
