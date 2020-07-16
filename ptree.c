@@ -29,7 +29,7 @@
 
 #include "ptree.h"
 
-static STRING(Proc) unsort = { 0 };
+static STRING(Proc) unsort;
 
 static int
 compar(void *c1, void *c2)
@@ -145,6 +145,7 @@ getprocesses(int flags)
     
     njobs = jsize / sizeof job[0];
 
+    CREATE(unsort);
     for (i=0; i < njobs ; i++) {
 	if ( tj = another(job[i].kp_proc.p_comm) ) {
 	    tj->pid = job[i].kp_proc.p_pid;
@@ -315,12 +316,13 @@ static void
 shuffle()
 {
     int todo = S(unsort);
+    int retry = 1;
     int i;
     Proc *p, *my;
 
-    while (todo > 0)
+    do { 
 	for (i=0; i < S(unsort); i++) {
-	    my = &T(unsort)[i];
+	    my = &(T(unsort)[i]);
 	    if (my->parent == (Proc*)-1) {
 		--todo;
 		if ( (my->pid != my->ppid) && (p = pfind(my->ppid)) ) {
@@ -339,6 +341,7 @@ shuffle()
 		    my->parent = 0;
 	    }
 	}
+    } while (todo > 0 && retry-- > 0);
 
     for (i=0; i < S(unsort); i++)
 	T(unsort)[i].children = children(&T(unsort)[i], 0);
