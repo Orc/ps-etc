@@ -145,7 +145,6 @@ getprocesses(int flags)
     
     njobs = jsize / sizeof job[0];
 
-    CREATE(unsort);
     for (i=0; i < njobs ; i++) {
 	if ( tj = another(job[i].kp_proc.p_comm) ) {
 	    tj->pid = job[i].kp_proc.p_pid;
@@ -351,6 +350,7 @@ shuffle()
 Proc *
 ptree(int flags)
 {
+    CREATE(unsort);
     S(unsort) = 0;
 
     if ( getprocesses(flags) == 0 )
