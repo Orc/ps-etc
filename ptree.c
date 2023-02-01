@@ -202,8 +202,10 @@ getprocesses(int flags)
     int j, i, njobs;
     char **av, *p, *q;
 
-    if ( !(k = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, NULL)) )
+    if ( !(k = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, NULL)) ) {
+	errno = EPERM;
 	return 0;
+    }
 
     if ( !(job = kvm_getprocs(k, KERN_PROC_ALL, 0, &njobs)) ) {
 	kvm_close(k);

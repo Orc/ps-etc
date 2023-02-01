@@ -501,7 +501,10 @@ main(int argc, char **argv)
     init = ptree(showargs ? PTREE_ARGS : 0);
 
     if ( !init ) {
-	perror(argv[0]);
+	if ( getuid() != 0 )
+	    fprintf(stderr, "You must be root to run this command\n");
+	else
+	    perror(argv[0]);
 	exit(1);
     }
 
